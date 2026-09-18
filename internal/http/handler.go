@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/untappedtech/conduit/internal/domain"
+	"github.com/untappedtech/conduit/internal/errors"
 	"github.com/untappedtech/conduit/internal/service"
 )
 
@@ -30,160 +31,183 @@ func (handler *APIHandler) RegisterRoutes(serveMux *http.ServeMux) {
 	serveMux.HandleFunc("/v1/", handler.handleCRUD)
 }
 
-func (handler *APIHandler) handleSchema(writer http.ResponseWriter, request *http.Request) {
-	log.Printf("[HTTP] %s %s from %s", request.Method, request.URL.Path, request.RemoteAddr)
+func (handler *APIHandler) handleSchema(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[HTTP] %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
 
-	requestPath := strings.TrimPrefix(request.URL.Path, "/v1/schema")
+	requestPath := strings.TrimPrefix(r.URL.Path, "/v1/schema")
 	tableName := strings.Trim(requestPath, "/")
 
-	if tableName == "" && request.Method == http.MethodGet {
-		tablesList, err := handler.apiService.ListTables(request.Context())
+	// GET /v1/schema → list tables
+	if tableName == "" && r.Method == http.MethodGet {
+		tables, err := handler.apiService.ListTables(r.Context())
 		if err != nil {
 			log.Printf("[ERROR] Failed to list tables: %v", err)
-			handler.responseEncoder.EncodeError(writer, request, http.StatusInternalServerError, "failed to list tables")
+			errors.ErrInternalServerError.Attach(err)
+			handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError)
 			return
 		}
-		handler.responseEncoder.EncodeResponse(writer, request, http.StatusOK, tablesList, domain.FormatJSON, "tables", nil)
+		handler.responseEncoder.EncodeResponse(w, r, http.StatusOK, tables, domain.FormatJSON, "tables", nil)
 		return
 	}
 
+	// Missing table name
 	if tableName == "" {
-		handler.responseEncoder.EncodeError(writer, request, http.StatusBadRequest, "invalid table identifier")
+		handler.responseEncoder.EncodeError(w, r, errors.ErrBadRequest)
 		return
 	}
 
-	switch request.Method {
+	switch r.Method {
+
 	case http.MethodGet:
-		columnDefinitions, err := handler.apiService.GetSchema(request.Context(), tableName)
+		columns, err := handler.apiService.GetSchema(r.Context(), tableName)
 		if err != nil {
-			handler.responseEncoder.EncodeError(writer, request, http.StatusNotFound, "schema not found")
+			errors.ErrNotFound.Attach(err, "Table: "+tableName)
+			handler.responseEncoder.EncodeError(w, r, errors.ErrNotFound)
 			return
 		}
-		handler.responseEncoder.EncodeResponse(writer, request, http.StatusOK, columnDefinitions, domain.FormatJSON, "columns", nil)
+		handler.responseEncoder.EncodeResponse(w, r, http.StatusOK, columns, domain.FormatJSON, "columns", nil)
 
 	case http.MethodPost:
-		var schemaPayload struct {
+		var payload struct {
 			Columns []domain.ColumnDef `json:"columns" yaml:"columns" xml:"column" toml:"columns"`
 		}
-		inputFormat, decodeError := DecodeInputPayload(request, &schemaPayload)
-		if decodeError != nil || len(schemaPayload.Columns) == 0 {
-			log.Printf("[ERROR] Invalid schema payload for table %s: %v", tableName, decodeError)
-			handler.responseEncoder.EncodeError(writer, request, http.StatusBadRequest, "invalid schema payload")
+		format, decodeErr := DecodeInputPayload(r, &payload)
+		if decodeErr != nil || len(payload.Columns) == 0 {
+			errors.ErrBadRequest.Attach(decodeErr, "Payload must include a 'columns' array")
+			handler.responseEncoder.EncodeError(w, r, errors.ErrBadRequest)
 			return
 		}
 
-		if err := handler.apiService.CreateTable(request.Context(), tableName, schemaPayload.Columns); err != nil {
+		if err := handler.apiService.CreateTable(r.Context(), tableName, payload.Columns); err != nil {
 			log.Printf("[ERROR] Failed to create table %s: %v", tableName, err)
-			handler.responseEncoder.EncodeError(writer, request, http.StatusInternalServerError, err.Error())
+			errors.ErrInternalServerError.Attach(err, "Table: "+tableName)
+			handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError)
 			return
 		}
 
 		log.Printf("[INFO] Table successfully created: %s", tableName)
-		columnDefinitions, _ := handler.apiService.GetSchema(request.Context(), tableName)
-		handler.responseEncoder.EncodeResponse(writer, request, http.StatusCreated, columnDefinitions, inputFormat, "columns", nil)
+		columns, _ := handler.apiService.GetSchema(r.Context(), tableName)
+		handler.responseEncoder.EncodeResponse(w, r, http.StatusCreated, columns, format, "columns", nil)
 
 	case http.MethodDelete:
-		if err := handler.apiService.DropTable(request.Context(), tableName); err != nil {
+		if err := handler.apiService.DropTable(r.Context(), tableName); err != nil {
 			log.Printf("[ERROR] Failed to drop table %s: %v", tableName, err)
-			handler.responseEncoder.EncodeError(writer, request, http.StatusInternalServerError, err.Error())
+			errors.ErrInternalServerError.Attach(err, "Table: "+tableName)
+			handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError)
 			return
 		}
 		log.Printf("[INFO] Table successfully dropped: %s", tableName)
-		writer.WriteHeader(http.StatusNoContent)
+		w.WriteHeader(http.StatusNoContent)
 
 	default:
-		handler.responseEncoder.EncodeError(writer, request, http.StatusMethodNotAllowed, "method not allowed")
+		handler.responseEncoder.EncodeError(w, r, errors.ErrMethodNotAllowed)
 	}
 }
 
-func (handler *APIHandler) handleCRUD(writer http.ResponseWriter, request *http.Request) {
-	log.Printf("[HTTP] %s %s from %s", request.Method, request.URL.Path, request.RemoteAddr)
+func (handler *APIHandler) handleCRUD(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[HTTP] %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
 
-	requestPath := strings.TrimPrefix(request.URL.Path, "/v1/")
+	requestPath := strings.TrimPrefix(r.URL.Path, "/v1/")
 	pathParts := strings.Split(strings.Trim(requestPath, "/"), "/")
 
 	if len(pathParts) == 0 || pathParts[0] == "" {
-		handler.responseEncoder.EncodeError(writer, request, http.StatusNotFound, "not found")
+		handler.responseEncoder.EncodeError(w, r, errors.ErrNotFound)
 		return
 	}
 
 	tableName := pathParts[0]
-	requestContext := request.Context()
 
-	if len(pathParts) == 1 && request.Method == http.MethodGet {
-		queryLimit, _ := strconv.Atoi(request.URL.Query().Get("limit"))
-		queryOffset, _ := strconv.Atoi(request.URL.Query().Get("offset"))
+	// GET /v1/<table>
+	if len(pathParts) == 1 && r.Method == http.MethodGet {
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 
-		recordSlice, err := handler.apiService.List(requestContext, tableName, queryLimit, queryOffset)
+		records, err := handler.apiService.List(r.Context(), tableName, limit, offset)
 		if err != nil {
 			log.Printf("[ERROR] Failed to list records for table %s: %v", tableName, err)
-			handler.responseEncoder.EncodeError(writer, request, http.StatusInternalServerError, err.Error())
+			errors.ErrInternalServerError.Attach(err, "Table: "+tableName)
+			handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError)
 			return
 		}
 
-		schema, _ := handler.apiService.GetSchema(requestContext, tableName)
-		handler.responseEncoder.EncodeResponse(writer, request, http.StatusOK, recordSlice, domain.FormatJSON, tableName, schema)
+		schema, _ := handler.apiService.GetSchema(r.Context(), tableName)
+		handler.responseEncoder.EncodeResponse(w, r, http.StatusOK, records, domain.FormatJSON, tableName, schema)
 		return
 	}
 
+	// /v1/<table>/<id>
 	if len(pathParts) == 2 {
 		recordID := pathParts[1]
-		switch request.Method {
+
+		switch r.Method {
+
 		case http.MethodGet:
-			singleRecord, err := handler.apiService.GetByID(requestContext, tableName, recordID)
+			record, err := handler.apiService.GetByID(r.Context(), tableName, recordID)
 			if err != nil {
-				handler.responseEncoder.EncodeError(writer, request, http.StatusNotFound, "not found")
+				errors.ErrNotFound.Attach(err, "Record ID: "+recordID)
+				handler.responseEncoder.EncodeError(w, r, errors.ErrNotFound)
 				return
 			}
-			schema, _ := handler.apiService.GetSchema(requestContext, tableName)
-			handler.responseEncoder.EncodeResponse(writer, request, http.StatusOK, singleRecord, domain.FormatJSON, tableName, schema)
+			schema, _ := handler.apiService.GetSchema(r.Context(), tableName)
+			handler.responseEncoder.EncodeResponse(w, r, http.StatusOK, record, domain.FormatJSON, tableName, schema)
 
 		case http.MethodPut, http.MethodPatch:
-			var recordPayload map[string]any
-			inputFormat, decodeError := DecodeInputPayload(request, &recordPayload)
-			if decodeError != nil {
-				handler.responseEncoder.EncodeError(writer, request, http.StatusBadRequest, "invalid payload")
+			var payload map[string]any
+			format, decodeErr := DecodeInputPayload(r, &payload)
+			if decodeErr != nil {
+				errors.ErrBadRequest.Attach(decodeErr)
+				handler.responseEncoder.EncodeError(w, r, errors.ErrBadRequest)
 				return
 			}
-			updatedRecord, err := handler.apiService.Update(requestContext, tableName, recordID, recordPayload)
+
+			record, err := handler.apiService.Update(r.Context(), tableName, recordID, payload)
 			if err != nil {
 				log.Printf("[ERROR] Failed to update record %s in table %s: %v", recordID, tableName, err)
-				handler.responseEncoder.EncodeError(writer, request, http.StatusInternalServerError, err.Error())
+				errors.ErrInternalServerError.Attach(err, "Record ID: "+recordID)
+				handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError)
 				return
 			}
-			schema, _ := handler.apiService.GetSchema(requestContext, tableName)
-			handler.responseEncoder.EncodeResponse(writer, request, http.StatusOK, updatedRecord, inputFormat, tableName, schema)
+
+			schema, _ := handler.apiService.GetSchema(r.Context(), tableName)
+			handler.responseEncoder.EncodeResponse(w, r, http.StatusOK, record, format, tableName, schema)
 
 		case http.MethodDelete:
-			if err := handler.apiService.Delete(requestContext, tableName, recordID); err != nil {
+			if err := handler.apiService.Delete(r.Context(), tableName, recordID); err != nil {
 				log.Printf("[ERROR] Failed to delete record %s in table %s: %v", recordID, tableName, err)
-				handler.responseEncoder.EncodeError(writer, request, http.StatusInternalServerError, err.Error())
+				errors.ErrInternalServerError.Attach(err, "Record ID: "+recordID)
+				handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError)
 				return
 			}
-			writer.WriteHeader(http.StatusNoContent)
+			w.WriteHeader(http.StatusNoContent)
+
 		default:
-			handler.responseEncoder.EncodeError(writer, request, http.StatusMethodNotAllowed, "method not allowed")
+			handler.responseEncoder.EncodeError(w, r, errors.ErrMethodNotAllowed)
 		}
 		return
 	}
 
-	if len(pathParts) == 1 && request.Method == http.MethodPost {
-		var recordPayload map[string]any
-		inputFormat, decodeError := DecodeInputPayload(request, &recordPayload)
-		if decodeError != nil {
-			handler.responseEncoder.EncodeError(writer, request, http.StatusBadRequest, "invalid payload")
+	// POST /v1/<table>
+	if len(pathParts) == 1 && r.Method == http.MethodPost {
+		var payload map[string]any
+		format, decodeErr := DecodeInputPayload(r, &payload)
+		if decodeErr != nil {
+			errors.ErrBadRequest.Attach(decodeErr)
+			handler.responseEncoder.EncodeError(w, r, errors.ErrBadRequest)
 			return
 		}
-		insertedRecord, err := handler.apiService.Insert(requestContext, tableName, recordPayload)
+
+		record, err := handler.apiService.Insert(r.Context(), tableName, payload)
 		if err != nil {
 			log.Printf("[ERROR] Failed to insert record into table %s: %v", tableName, err)
-			handler.responseEncoder.EncodeError(writer, request, http.StatusInternalServerError, err.Error())
+			errors.ErrInternalServerError.Attach(err)
+			handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError)
 			return
 		}
-		schema, _ := handler.apiService.GetSchema(requestContext, tableName)
-		handler.responseEncoder.EncodeResponse(writer, request, http.StatusCreated, insertedRecord, inputFormat, tableName, schema)
+
+		schema, _ := handler.apiService.GetSchema(r.Context(), tableName)
+		handler.responseEncoder.EncodeResponse(w, r, http.StatusCreated, record, format, tableName, schema)
 		return
 	}
 
-	handler.responseEncoder.EncodeError(writer, request, http.StatusNotFound, "not found")
+	handler.responseEncoder.EncodeError(w, r, errors.ErrNotFound)
 }

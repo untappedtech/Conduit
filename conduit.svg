@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 256">
+  <defs>
+    <linearGradient id="conduitGrad"
+      gradientUnits="userSpaceOnUse"
+      x1="0" y1="128" x2="512" y2="128">
+      <stop offset="10%" stop-color="#3b82f6" />
+      <stop offset="50%" stop-color="#22c1c3" />
+      <stop offset="90%" stop-color="#16a34a" />
+    </linearGradient>
+  </defs>
+
+  <g fill="none"
+     stroke="url(#conduitGrad)"
+     stroke-width="10"
+     stroke-linecap="round"
+     stroke-linejoin="round">
+
+    <!-- Center node -->
+    <circle cx="256" cy="128" r="37" />
+
+    <!-- === LEFT SIDE === -->
+
+    <!-- Top-left -->
+    <path d="
+      M 213 85
+      L 175 49
+      A 50 50 0 0 0 165 49
+      L 120 49
+    " />
+    <circle cx="100" cy="49" r="16" />
+
+    <!-- Mid-left -->
+    <line x1="200" y1="128" x2="120" y2="128" />
+    <circle cx="100" cy="128" r="16" />
+
+    <!-- Bottom-left -->
+    <path d="
+      M 213 171
+      L 175 207
+      A 50 50 0 0 1 165 207
+      L 120 207
+    " />
+    <circle cx="100" cy="207" r="16" />
+
+    <!-- === RIGHT SIDE === -->
+
+    <!-- Top-right -->
+    <path d="
+      M 299 85
+      L 337 49
+      A 50 50 0 0 1 345 49
+      L 392 49
+    " />
+    <circle cx="412" cy="49" r="16" />
+
+    <!-- Mid-right -->
+    <line x1="312" y1="128" x2="392" y2="128" />
+    <circle cx="412" cy="128" r="16" />
+
+    <!-- Bottom-right -->
+    <path d="
+      M 299 171
+      L 337 207
+      A 50 50 0 0 0 345 207
+      L 392 207
+    " />
+    <circle cx="412" cy="207" r="16" />
+
+  </g>
+</svg>

@@ -1,9 +1,9 @@
-# Conduit <img src="conduit_light.png" alt="Conduit Icon Icon" width="160" align="right">
+# Conduit <img src="conduit.svg" alt="Conduit Icon Icon" width="180" align="right">
 
 ### Multi‑Format, Database‑Agnostic REST Engine
 
 Conduit is a **zero‑boilerplate REST engine** that instantly exposes your database as a fully‑typed, multi‑format HTTP API.  
-It supports **JSON, XML, YAML, TOML, NDJSON, and CSV** — simultaneously — and works with **any SQL database** through a pluggable driver system.
+It supports **JSON, XML, YAML, TOML, NDJSON, CSV, and CBOR** — simultaneously — and works with **any SQL database** through a pluggable driver system.
 
 Conduit eliminates the need to hand‑craft REST interfaces, controllers, serializers, or schema definitions.  
 Point it at a database, start the server, and your tables become live REST endpoints.
@@ -13,7 +13,7 @@ Point it at a database, start the server, and your tables become live REST endpo
 ## ✨ Key Features
 
 - **Multi‑format input & output**  
-  JSON, XML, YAML, TOML, NDJSON, CSV — all first‑class citizens.
+  JSON, XML, YAML, TOML, NDJSON, CSV, CBOR — all first‑class citizens.
 
 - **Database‑agnostic**  
   Official drivers for SQLite, PostgreSQL, MySQL/MariaDB, and SQL Server.
@@ -65,10 +65,10 @@ It's ideal for:
 ## 🧩 Architecture Overview
 
 ```
-                ┌────────────────────────────┐
-                │        HTTP Request        │
-                │  JSON / XML / YAML / TOML  │
-                └──────────────┬─────────────┘
+              ┌────────────────────────────────┐
+              │          HTTP Request          │
+              │ JSON / XML / YAML / TOML / CSV │
+              └──────────────┬─────────────────┘
                                ▼
                     ┌───────────────────┐
                     │   Format Parser   │
@@ -88,10 +88,10 @@ It's ideal for:
                     │   SQL Database    │
                     └─────────┬─────────┘
                               ▼
-                ┌────────────────────────────────┐
-                │       HTTP Response            │
-                │ JSON / XML / YAML / TOML / CSV │
-                └────────────────────────────────┘
+              ┌────────────────────────────────┐
+              │          HTTP Response         │
+              │ JSON / XML / YAML / TOML / CSV │
+              └────────────────────────────────┘
 ```
 
 ---

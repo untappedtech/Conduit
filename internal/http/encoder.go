@@ -12,6 +12,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/untappedtech/conduit/internal/domain"
+	"github.com/untappedtech/conduit/internal/errors"
 )
 
 type ResponseEncoder struct{}
@@ -59,44 +60,137 @@ func (e *ResponseEncoder) NegotiateOutputFormat(r *http.Request, input domain.Fo
 	return domain.FormatJSON
 }
 
-func (e *ResponseEncoder) EncodeError(w http.ResponseWriter, r *http.Request, status int, msg string) {
+func (e *ResponseEncoder) EncodeError(
+	w http.ResponseWriter,
+	r *http.Request,
+	spec errors.ErrorSpec,
+) {
 	negotiated := e.NegotiateOutputFormat(r, domain.FormatJSON)
+
+	// Build envelope
+	errorEnvelope := map[string]any{
+		"error": map[string]any{
+			"title":             spec.Title,
+			"message":           spec.DefaultMessage,
+			"status":            spec.Status,
+			"details":           spec.Details,
+			"documentation_url": spec.DocumentationURL(),
+		},
+	}
 
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("Content-Type", negotiated.ContentType())
-	w.WriteHeader(status)
+	w.WriteHeader(spec.Status)
 
 	switch negotiated {
+
 	case domain.FormatXML:
 		_, _ = w.Write([]byte(xml.Header))
-		_, _ = fmt.Fprintf(w, "<response>\n  <error>%s</error>\n  <code>%d</code>\n</response>\n", escapeXMLText(msg), status)
+		_, _ = fmt.Fprintf(
+			w,
+			"<response>\n"+
+				"  <error>\n"+
+				"    <title>%s</title>\n"+
+				"    <message>%s</message>\n"+
+				"    <status>%d</status>\n"+
+				"    <documentation_url>%s</documentation_url>\n"+
+				"    <details>\n",
+			escapeXMLText(spec.Title),
+			escapeXMLText(spec.DefaultMessage),
+			spec.Status,
+			escapeXMLText(spec.DocumentationURL()),
+		)
+		for _, d := range spec.Details {
+			_, _ = fmt.Fprintf(w, "      <item>%s</item>\n", escapeXMLText(d))
+		}
+		_, _ = fmt.Fprintf(w, "    </details>\n  </error>\n</response>\n")
+
 	case domain.FormatYAML:
-		_, _ = fmt.Fprintf(w, "error: %q\ncode: %d\n", msg, status)
+		_, _ = fmt.Fprintf(
+			w,
+			"error:\n"+
+				"  title: %q\n"+
+				"  message: %q\n"+
+				"  status: %d\n"+
+				"  documentation_url: %q\n"+
+				"  details:\n",
+			spec.Title,
+			spec.DefaultMessage,
+			spec.Status,
+			spec.DocumentationURL(),
+		)
+		for _, d := range spec.Details {
+			_, _ = fmt.Fprintf(w, "    - %q\n", d)
+		}
+
 	case domain.FormatTOML:
-		_, _ = fmt.Fprintf(w, "error = %q\ncode = %d\n", msg, status)
+		_, _ = fmt.Fprintf(
+			w,
+			"[error]\n"+
+				"title = %q\n"+
+				"message = %q\n"+
+				"status = %d\n"+
+				"documentation_url = %q\n"+
+				"details = [",
+			spec.Title,
+			spec.DefaultMessage,
+			spec.Status,
+			spec.DocumentationURL(),
+		)
+		for i, d := range spec.Details {
+			if i > 0 {
+				_, _ = w.Write([]byte(", "))
+			}
+			_, _ = fmt.Fprintf(w, "%q", d)
+		}
+		_, _ = w.Write([]byte("]\n"))
+
 	case domain.FormatCSV:
 		csvWriter := csv.NewWriter(w)
-		_ = csvWriter.Write([]string{"error", "code"})
-		_ = csvWriter.Write([]string{msg, fmt.Sprintf("%d", status)})
+		_ = csvWriter.Write([]string{"field", "value"})
+		_ = csvWriter.Write([]string{"title", spec.Title})
+		_ = csvWriter.Write([]string{"message", spec.DefaultMessage})
+		_ = csvWriter.Write([]string{"status", fmt.Sprintf("%d", spec.Status)})
+		_ = csvWriter.Write([]string{"documentation_url", spec.DocumentationURL()})
+		for _, d := range spec.Details {
+			_ = csvWriter.Write([]string{"detail", d})
+		}
 		csvWriter.Flush()
+
 	case domain.FormatCBOR:
 		enc := cborCanonicalEncoder()
-		data, _ := enc.Marshal(map[string]any{
-			"error": msg,
-			"code":  status,
-		})
+		data, _ := enc.Marshal(errorEnvelope)
 		_, _ = w.Write(data)
+
 	case domain.FormatNDJSON:
-		_, _ = fmt.Fprintf(w, "{\"error\": %q, \"code\": %d}\n", msg, status)
+		_, _ = fmt.Fprintf(
+			w,
+			"{\"error\":{\"title\":%q,\"message\":%q,\"status\":%d,\"documentation_url\":%q,\"details\":%s}}\n",
+			spec.Title,
+			spec.DefaultMessage,
+			spec.Status,
+			spec.DocumentationURL(),
+			mustJSON(spec.Details),
+		)
 		if flusher, ok := w.(http.Flusher); ok {
 			flusher.Flush()
 		}
-		return
+
 	case domain.FormatJSON:
 		fallthrough
 	default:
-		_, _ = fmt.Fprintf(w, "{\n  \"error\": %q,\n  \"code\": %d\n}\n", msg, status)
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(errorEnvelope)
 	}
+
+	// Reset details so the spec can be reused safely
+	spec.Reset()
+}
+
+func mustJSON(v any) string {
+	b, _ := json.Marshal(v)
+	return string(b)
 }
 
 func getOrderedKeys(record map[string]any, schema []domain.ColumnDef) []string {
