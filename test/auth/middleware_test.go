@@ -8,12 +8,13 @@ import (
 	authPkg "github.com/untappedtech/conduit/internal/auth"
 	"github.com/untappedtech/conduit/internal/auth/impl"
 	"github.com/untappedtech/conduit/internal/domain"
+	"github.com/untappedtech/conduit/internal/errors"
 )
 
 type dummyResponderMW struct{}
 
-func (d dummyResponderMW) EncodeError(w http.ResponseWriter, r *http.Request, status int, msg string) {
-	http.Error(w, msg, status)
+func (d dummyResponderMW) EncodeError(w http.ResponseWriter, r *http.Request, spec errors.ErrorSpec) {
+	http.Error(w, spec.Title, spec.Status)
 }
 
 func TestMiddleware_Unauthorized(t *testing.T) {

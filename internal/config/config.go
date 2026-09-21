@@ -60,7 +60,7 @@ func loadConfigFile(filePath string) (*domain.ServerConfig, error) {
 		return nil, fmt.Errorf("failed to parse config %s: %w", filePath, err)
 	}
 
-	if serverConfig.Server.DefaultLimit <= 0 {
+	if serverConfig.Server.DefaultLimit < 0 {
 		serverConfig.Server.DefaultLimit = 50
 	}
 
@@ -74,7 +74,7 @@ func GenerateDefaultConfig(formatType string, outputFilePath string) error {
 	defaultConfig.Server.DefaultLimit = 50
 
 	defaultConfig.Database.Driver = "sqlite"
-	defaultConfig.Database.DSN = "./app.db?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=page_size(16384)"
+	defaultConfig.Database.DSN = "./app.db?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
 
 	defaultConfig.Policy.PublicReads = true
 	defaultConfig.Policy.PublicWrites = true

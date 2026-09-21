@@ -6,10 +6,11 @@ import (
 	"strings"
 
 	"github.com/untappedtech/conduit/internal/domain"
+	"github.com/untappedtech/conduit/internal/errors"
 )
 
 type ErrorResponder interface {
-	EncodeError(responseWriter http.ResponseWriter, httpRequest *http.Request, statusCode int, errorMessage string)
+	EncodeError(responseWriter http.ResponseWriter, httpRequest *http.Request, spec errors.ErrorSpec)
 }
 
 func AuthMiddleware(authChain []domain.AuthProvider, tokenExtractor TokenExtractor, errorResponder ErrorResponder) func(http.Handler) http.Handler {
@@ -47,7 +48,8 @@ func AuthMiddleware(authChain []domain.AuthProvider, tokenExtractor TokenExtract
 			for _, provider := range authChain {
 				allowed, handled, err := provider.Authorize(request.Context(), authReq)
 				if err != nil {
-					errorResponder.EncodeError(writer, request, http.StatusUnauthorized, "unauthorized access")
+					errors.ErrUnauthorized.Attach(err)
+					errorResponder.EncodeError(writer, request, errors.ErrUnauthorized)
 					return
 				}
 				if handled {
@@ -57,7 +59,7 @@ func AuthMiddleware(authChain []domain.AuthProvider, tokenExtractor TokenExtract
 			}
 
 			if !authorized {
-				errorResponder.EncodeError(writer, request, http.StatusUnauthorized, "unauthorized access")
+				errorResponder.EncodeError(writer, request, errors.ErrUnauthorized)
 				return
 			}
 
