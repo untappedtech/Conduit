@@ -24,19 +24,38 @@ func (e ErrorSpec) DocumentationURL() string {
 	return fmt.Sprintf("https://conduit.untapped.tech/docs/errors/%s", e.Slug())
 }
 
-// Attach adds contextual details or error messages to the spec.
-func (e *ErrorSpec) Attach(err error, context ...string) {
-	if err != nil {
-		e.Details = append(e.Details, fmt.Sprintf("Error: %v", err))
+// Error implements the error interface.
+func (e ErrorSpec) Error() string {
+	if len(e.Details) > 0 {
+		return fmt.Sprintf("%s: %s (%s)", e.Title, e.DefaultMessage, strings.Join(e.Details, "; "))
 	}
-	for _, c := range context {
-		if c != "" {
-			e.Details = append(e.Details, c)
-		}
+	return fmt.Sprintf("%s: %s", e.Title, e.DefaultMessage)
+}
+
+// Clone creates an independent deep copy of the ErrorSpec.
+func (e ErrorSpec) Clone() ErrorSpec {
+	var details []string
+	if len(e.Details) > 0 {
+		details = make([]string, len(e.Details))
+		copy(details, e.Details)
+	}
+	return ErrorSpec{
+		Title:          e.Title,
+		Status:         e.Status,
+		DefaultMessage: e.DefaultMessage,
+		Details:        details,
 	}
 }
 
-// Reset clears details so the spec can be reused safely.
-func (e *ErrorSpec) Reset() {
-	e.Details = nil
+// With returns a new ErrorSpec instance with the provided error and contextual details attached.
+// The receiver is never modified, guaranteeing safe concurrent use without data leakage.
+func (e ErrorSpec) With(err error, context ...string) ErrorSpec {
+	instance := e.Clone()
+	instance.Details = append(instance.Details, BuildDetails(err, context...)...)
+	return instance
+}
+
+// WithDetails returns a new ErrorSpec instance with contextual details attached.
+func (e ErrorSpec) WithDetails(context ...string) ErrorSpec {
+	return e.With(nil, context...)
 }

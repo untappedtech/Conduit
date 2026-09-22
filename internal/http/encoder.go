@@ -183,9 +183,6 @@ func (e *ResponseEncoder) EncodeError(
 		enc.SetIndent("", "  ")
 		_ = enc.Encode(errorEnvelope)
 	}
-
-	// Reset details so the spec can be reused safely
-	spec.Reset()
 }
 
 func mustJSON(v any) string {

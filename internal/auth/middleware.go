@@ -48,8 +48,7 @@ func AuthMiddleware(authChain []domain.AuthProvider, tokenExtractor TokenExtract
 			for _, provider := range authChain {
 				allowed, handled, err := provider.Authorize(request.Context(), authReq)
 				if err != nil {
-					errors.ErrUnauthorized.Attach(err)
-					errorResponder.EncodeError(writer, request, errors.ErrUnauthorized)
+					errorResponder.EncodeError(writer, request, errors.ErrUnauthorized.With(err))
 					return
 				}
 				if handled {

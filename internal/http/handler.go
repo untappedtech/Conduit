@@ -42,8 +42,7 @@ func (handler *APIHandler) handleSchema(w http.ResponseWriter, r *http.Request) 
 		tables, err := handler.apiService.ListTables(r.Context())
 		if err != nil {
 			log.Printf("[ERROR] Failed to list tables: %v", err)
-			errors.ErrInternalServerError.Attach(err)
-			handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError)
+			handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError.With(err))
 			return
 		}
 		handler.responseEncoder.EncodeResponse(w, r, http.StatusOK, tables, domain.FormatJSON, "tables", nil)
@@ -61,8 +60,7 @@ func (handler *APIHandler) handleSchema(w http.ResponseWriter, r *http.Request) 
 	case http.MethodGet:
 		columns, err := handler.apiService.GetSchema(r.Context(), tableName)
 		if err != nil {
-			errors.ErrNotFound.Attach(err, "Table: "+tableName)
-			handler.responseEncoder.EncodeError(w, r, errors.ErrNotFound)
+			handler.responseEncoder.EncodeError(w, r, errors.ErrNotFound.With(err, "Table: "+tableName))
 			return
 		}
 		handler.responseEncoder.EncodeResponse(w, r, http.StatusOK, columns, domain.FormatJSON, "columns", nil)
@@ -73,15 +71,13 @@ func (handler *APIHandler) handleSchema(w http.ResponseWriter, r *http.Request) 
 		}
 		format, decodeErr := DecodeInputPayload(r, &payload)
 		if decodeErr != nil || len(payload.Columns) == 0 {
-			errors.ErrBadRequest.Attach(decodeErr, "Payload must include a 'columns' array")
-			handler.responseEncoder.EncodeError(w, r, errors.ErrBadRequest)
+			handler.responseEncoder.EncodeError(w, r, errors.ErrBadRequest.With(decodeErr, "Payload must include a 'columns' array"))
 			return
 		}
 
 		if err := handler.apiService.CreateTable(r.Context(), tableName, payload.Columns); err != nil {
 			log.Printf("[ERROR] Failed to create table %s: %v", tableName, err)
-			errors.ErrInternalServerError.Attach(err, "Table: "+tableName)
-			handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError)
+			handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError.With(err, "Table: "+tableName))
 			return
 		}
 
@@ -92,8 +88,7 @@ func (handler *APIHandler) handleSchema(w http.ResponseWriter, r *http.Request) 
 	case http.MethodDelete:
 		if err := handler.apiService.DropTable(r.Context(), tableName); err != nil {
 			log.Printf("[ERROR] Failed to drop table %s: %v", tableName, err)
-			errors.ErrInternalServerError.Attach(err, "Table: "+tableName)
-			handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError)
+			handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError.With(err, "Table: "+tableName))
 			return
 		}
 		log.Printf("[INFO] Table successfully dropped: %s", tableName)
@@ -125,8 +120,7 @@ func (handler *APIHandler) handleCRUD(w http.ResponseWriter, r *http.Request) {
 		records, err := handler.apiService.List(r.Context(), tableName, limit, offset)
 		if err != nil {
 			log.Printf("[ERROR] Failed to list records for table %s: %v", tableName, err)
-			errors.ErrInternalServerError.Attach(err, "Table: "+tableName)
-			handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError)
+			handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError.With(err, "Table: "+tableName))
 			return
 		}
 
@@ -144,8 +138,7 @@ func (handler *APIHandler) handleCRUD(w http.ResponseWriter, r *http.Request) {
 		case http.MethodGet:
 			record, err := handler.apiService.GetByID(r.Context(), tableName, recordID)
 			if err != nil {
-				errors.ErrNotFound.Attach(err, "Record ID: "+recordID)
-				handler.responseEncoder.EncodeError(w, r, errors.ErrNotFound)
+				handler.responseEncoder.EncodeError(w, r, errors.ErrNotFound.With(err, "Record ID: "+recordID))
 				return
 			}
 			schema, _ := handler.apiService.GetSchema(r.Context(), tableName)
@@ -155,16 +148,14 @@ func (handler *APIHandler) handleCRUD(w http.ResponseWriter, r *http.Request) {
 			var payload map[string]any
 			format, decodeErr := DecodeInputPayload(r, &payload)
 			if decodeErr != nil {
-				errors.ErrBadRequest.Attach(decodeErr)
-				handler.responseEncoder.EncodeError(w, r, errors.ErrBadRequest)
+				handler.responseEncoder.EncodeError(w, r, errors.ErrBadRequest.With(decodeErr))
 				return
 			}
 
 			record, err := handler.apiService.Update(r.Context(), tableName, recordID, payload)
 			if err != nil {
 				log.Printf("[ERROR] Failed to update record %s in table %s: %v", recordID, tableName, err)
-				errors.ErrInternalServerError.Attach(err, "Record ID: "+recordID)
-				handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError)
+				handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError.With(err, "Record ID: "+recordID))
 				return
 			}
 
@@ -174,8 +165,7 @@ func (handler *APIHandler) handleCRUD(w http.ResponseWriter, r *http.Request) {
 		case http.MethodDelete:
 			if err := handler.apiService.Delete(r.Context(), tableName, recordID); err != nil {
 				log.Printf("[ERROR] Failed to delete record %s in table %s: %v", recordID, tableName, err)
-				errors.ErrInternalServerError.Attach(err, "Record ID: "+recordID)
-				handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError)
+				handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError.With(err, "Record ID: "+recordID))
 				return
 			}
 			w.WriteHeader(http.StatusNoContent)
@@ -191,16 +181,14 @@ func (handler *APIHandler) handleCRUD(w http.ResponseWriter, r *http.Request) {
 		var payload map[string]any
 		format, decodeErr := DecodeInputPayload(r, &payload)
 		if decodeErr != nil {
-			errors.ErrBadRequest.Attach(decodeErr)
-			handler.responseEncoder.EncodeError(w, r, errors.ErrBadRequest)
+			handler.responseEncoder.EncodeError(w, r, errors.ErrBadRequest.With(decodeErr))
 			return
 		}
 
 		record, err := handler.apiService.Insert(r.Context(), tableName, payload)
 		if err != nil {
 			log.Printf("[ERROR] Failed to insert record into table %s: %v", tableName, err)
-			errors.ErrInternalServerError.Attach(err)
-			handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError)
+			handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError.With(err))
 			return
 		}
 

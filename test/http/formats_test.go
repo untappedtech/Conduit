@@ -90,12 +90,12 @@ func TestHTTP_ErrorFormats_All(t *testing.T) {
 		expectSnip []string
 	}
 	cases := []testCase{
-		{"json", "/v1/sports/999?format=json", []string{`"error": "not found"`, `"code": 404`}},
-		{"yaml", "/v1/sports/999?format=yaml", []string{"error: not found", "code: 404"}},
-		{"toml", "/v1/sports/999?format=toml", []string{`error = "not found"`, "code = 404"}},
-		{"xml", "/v1/sports/999?format=xml", []string{"<response>", "<code>404</code>"}},
-		{"ndjson", "/v1/sports/999?format=ndjson", []string{`"error":"not found"`, `"code":404`}},
-		{"csv", "/v1/sports/999?format=csv", []string{"error,code", "not found,404"}},
+		{"json", "/v1/sports/999?format=json", []string{`"title": "Not Found"`, `"status": 404`}},
+		{"yaml", "/v1/sports/999?format=yaml", []string{`title: "Not Found"`, `status: 404`}},
+		{"toml", "/v1/sports/999?format=toml", []string{`title = "Not Found"`, `status = 404`}},
+		{"xml", "/v1/sports/999?format=xml", []string{"<response>", "<status>404</status>", "<title>Not Found</title>"}},
+		{"ndjson", "/v1/sports/999?format=ndjson", []string{`"title":"Not Found"`, `"status":404`}},
+		{"csv", "/v1/sports/999?format=csv", []string{"title,Not Found", "status,404"}},
 	}
 
 	for _, tc := range cases {
@@ -316,9 +316,17 @@ func TestHTTP_CBORFormatAndOrdering(t *testing.T) {
 		t.Fatalf("expected sports array in CBOR payload, got %#v", payload)
 	}
 
-	record := sportsList[0].(map[string]any)
+	var name string
+	switch r := sportsList[0].(type) {
+	case map[string]any:
+		name, _ = r["name"].(string)
+	case map[any]any:
+		name, _ = r["name"].(string)
+	default:
+		t.Fatalf("unexpected record type: %T", sportsList[0])
+	}
 	// Check keys presence
-	if record["name"] != "Golf" {
-		t.Fatalf("expected name=Golf, got %#v", record["name"])
+	if name != "Golf" {
+		t.Fatalf("expected name=Golf, got %#v", name)
 	}
 }
