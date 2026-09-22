@@ -43,29 +43,46 @@ func (apiService *APIService) DropTable(ctx context.Context, tableName string) e
 	return apiService.databaseDriver.DropTable(ctx, tableName)
 }
 
-func (apiService *APIService) List(ctx context.Context, tableName string, queryLimit int, queryOffset int) ([]map[string]any, error) {
+func (apiService *APIService) List(ctx context.Context, tableName string, req domain.ListRequest) ([]map[string]any, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
+	}
+
+	if req.Order != "" || req.Where != "" {
+		schema, err := apiService.databaseDriver.Schema(ctx, tableName)
+		if err != nil {
+			return nil, err
+		}
+		if req.Order != "" {
+			if _, _, err := ValidateOrder(req.Order, schema); err != nil {
+				return nil, err
+			}
+		}
+		if req.Where != "" {
+			if _, err := ParseWhere(req.Where, schema); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	defaultLimit := apiService.serverConfig.Server.DefaultLimit
 
 	// Case 1: limit missing or explicitly 0 → use default limit
-	if queryLimit <= 0 {
-		queryLimit = defaultLimit
+	if req.Limit <= 0 {
+		req.Limit = defaultLimit
 	} else {
 		// Case 2: limit > 0 → apply server cap if present
-		if defaultLimit > 0 && queryLimit > defaultLimit {
-			queryLimit = defaultLimit
+		if defaultLimit > 0 && req.Limit > defaultLimit {
+			req.Limit = defaultLimit
 		}
 	}
 
 	// Case 3: effective limit = 0 → unlimited
-	if queryLimit == 0 {
-		queryLimit = -1 // sentinel for unlimited
+	if req.Limit == 0 {
+		req.Limit = -1 // sentinel for unlimited
 	}
 
-	return apiService.databaseDriver.List(ctx, tableName, queryLimit, queryOffset)
+	return apiService.databaseDriver.List(ctx, tableName, req)
 }
 
 func (apiService *APIService) GetByID(ctx context.Context, tableName string, recordID string) (map[string]any, error) {

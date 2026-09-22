@@ -29,7 +29,7 @@ func TestLimitOffsetListing_UnlimitedMode(t *testing.T) {
 		}
 	}
 
-	list0, err := api.List(ctx, "items", 0, 0)
+	list0, err := api.List(ctx, "items", domain.ListRequest{Limit: 0, Offset: 0})
 	if err != nil {
 		t.Fatalf("List error: %v", err)
 	}

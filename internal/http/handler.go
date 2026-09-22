@@ -51,7 +51,7 @@ func (handler *APIHandler) handleSchema(w http.ResponseWriter, r *http.Request) 
 
 	// Missing table name
 	if tableName == "" {
-		handler.responseEncoder.EncodeError(w, r, errors.ErrBadRequest)
+		handler.responseEncoder.EncodeError(w, r, errors.ErrBadRequest.WithDetails("No table name specified"))
 		return
 	}
 
@@ -117,8 +117,27 @@ func (handler *APIHandler) handleCRUD(w http.ResponseWriter, r *http.Request) {
 		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 
-		records, err := handler.apiService.List(r.Context(), tableName, limit, offset)
+		req := domain.ListRequest{
+			Limit:  limit,
+			Offset: offset,
+			Order:  r.URL.Query().Get("order"),
+			Where:  r.URL.Query().Get("where"),
+		}
+
+		records, err := handler.apiService.List(r.Context(), tableName, req)
 		if err != nil {
+			if service.IsInvalidColumn(err) {
+				handler.responseEncoder.EncodeError(w, r, errors.ErrBadRequest.With(err))
+				return
+			}
+			if service.IsMalformedQuery(err) {
+				handler.responseEncoder.EncodeError(w, r, errors.ErrUnprocessableEntity.With(err))
+				return
+			}
+			if err == domain.ErrNotFound {
+				handler.responseEncoder.EncodeError(w, r, errors.ErrNotFound.With(err, "Table: "+tableName))
+				return
+			}
 			log.Printf("[ERROR] Failed to list records for table %s: %v", tableName, err)
 			handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError.With(err, "Table: "+tableName))
 			return

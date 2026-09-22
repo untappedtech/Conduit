@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/untappedtech/conduit/internal/domain"
+	"github.com/untappedtech/conduit/internal/service"
 	_ "modernc.org/sqlite"
 )
 
@@ -28,8 +29,12 @@ func NewSQLiteEngine(dataSourceName string) (domain.DatabaseDriver, error) {
 	return &SQLiteEngine{sqlDatabase: dbConn}, nil
 }
 
-func quoteSQLiteIdent(identifier string) string {
+func (engine *SQLiteEngine) QuoteIdent(identifier string) string {
 	return `"` + strings.ReplaceAll(identifier, `"`, `""`) + `"`
+}
+
+func (engine *SQLiteEngine) Placeholder(index int) string {
+	return "?"
 }
 
 func (engine *SQLiteEngine) Schema(ctx context.Context, tableName string) ([]domain.ColumnDef, error) {
@@ -37,7 +42,7 @@ func (engine *SQLiteEngine) Schema(ctx context.Context, tableName string) ([]dom
 		return nil, domain.ErrInvalidID
 	}
 
-	schemaQuery := fmt.Sprintf(`PRAGMA table_info(%s)`, quoteSQLiteIdent(tableName))
+	schemaQuery := fmt.Sprintf(`PRAGMA table_info(%s)`, engine.QuoteIdent(tableName))
 	rows, err := engine.sqlDatabase.QueryContext(ctx, schemaQuery)
 	if err != nil {
 		return nil, err
@@ -147,13 +152,13 @@ func (engine *SQLiteEngine) CreateTable(ctx context.Context, tableName string, c
 		if !validSQLiteIdent.MatchString(col.Name) {
 			return fmt.Errorf("invalid column name: %s", col.Name)
 		}
-		colSQL := fmt.Sprintf("%s %s", quoteSQLiteIdent(col.Name), strings.ToUpper(col.Type))
+		colSQL := fmt.Sprintf("%s %s", engine.QuoteIdent(col.Name), strings.ToUpper(col.Type))
 
 		isPK := col.PK != nil && *col.PK
 		isAuto := col.Autoincrement != nil && *col.Autoincrement
 
 		if isAuto {
-			colSQL = fmt.Sprintf("%s INTEGER PRIMARY KEY AUTOINCREMENT", quoteSQLiteIdent(col.Name))
+			colSQL = fmt.Sprintf("%s INTEGER PRIMARY KEY AUTOINCREMENT", engine.QuoteIdent(col.Name))
 		} else if isPK {
 			colSQL += " PRIMARY KEY"
 		}
@@ -167,7 +172,7 @@ func (engine *SQLiteEngine) CreateTable(ctx context.Context, tableName string, c
 		columnDeclarations = append(columnDeclarations, colSQL)
 	}
 
-	createQuery := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (%s);`, quoteSQLiteIdent(tableName), strings.Join(columnDeclarations, ", "))
+	createQuery := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (%s);`, engine.QuoteIdent(tableName), strings.Join(columnDeclarations, ", "))
 	if _, err := dbTransaction.ExecContext(ctx, createQuery); err != nil {
 		return err
 	}
@@ -179,32 +184,63 @@ func (engine *SQLiteEngine) DropTable(ctx context.Context, tableName string) err
 	if !validSQLiteIdent.MatchString(tableName) {
 		return domain.ErrInvalidID
 	}
-	dropQuery := fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, quoteSQLiteIdent(tableName))
+	dropQuery := fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, engine.QuoteIdent(tableName))
 	_, err := engine.sqlDatabase.ExecContext(ctx, dropQuery)
 	return err
 }
 
-func (engine *SQLiteEngine) List(ctx context.Context, tableName string, queryLimit int, queryOffset int) ([]map[string]any, error) {
+func (engine *SQLiteEngine) List(ctx context.Context, tableName string, req domain.ListRequest) ([]map[string]any, error) {
 	if !validSQLiteIdent.MatchString(tableName) {
 		return nil, domain.ErrInvalidID
 	}
 
-	var (
-		selectQuery string
-		rows        *sql.Rows
-		err         error
-	)
+	query := fmt.Sprintf("SELECT * FROM %s", engine.QuoteIdent(tableName))
+	args := []any{}
 
-	// Unlimited mode: limit < 0 → no LIMIT clause
-	if queryLimit < 0 {
-		selectQuery = fmt.Sprintf(`SELECT * FROM %s OFFSET ?`, quoteSQLiteIdent(tableName))
-		rows, err = engine.sqlDatabase.QueryContext(ctx, selectQuery, queryOffset)
-	} else {
-		// Normal bounded mode
-		selectQuery = fmt.Sprintf(`SELECT * FROM %s LIMIT ? OFFSET ?`, quoteSQLiteIdent(tableName))
-		rows, err = engine.sqlDatabase.QueryContext(ctx, selectQuery, queryLimit, queryOffset)
+	if req.Where != "" {
+		cols, err := engine.Schema(ctx, tableName)
+		if err != nil {
+			return nil, err
+		}
+		whereSQL, whereArgs, err := service.ParseWhereSQL(req.Where, cols, engine, 1)
+		if err != nil {
+			return nil, err
+		}
+		if whereSQL != "" {
+			query += " WHERE " + whereSQL
+			args = append(args, whereArgs...)
+		}
 	}
 
+	if req.Order != "" {
+		cols, err := engine.Schema(ctx, tableName)
+		if err != nil {
+			return nil, err
+		}
+		col, desc, err := service.ValidateOrder(req.Order, cols)
+		if err != nil {
+			return nil, err
+		}
+		if col != "" {
+			if desc {
+				query += fmt.Sprintf(" ORDER BY %s DESC", engine.QuoteIdent(col))
+			} else {
+				query += fmt.Sprintf(" ORDER BY %s ASC", engine.QuoteIdent(col))
+			}
+		}
+	}
+
+	// Unlimited mode: req.Limit < 0 → no LIMIT clause
+	if req.Limit < 0 {
+		query += " OFFSET ?"
+		args = append(args, req.Offset)
+	} else {
+		// Normal bounded mode
+		query += " LIMIT ? OFFSET ?"
+		args = append(args, req.Limit, req.Offset)
+	}
+
+	rows, err := engine.sqlDatabase.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +255,7 @@ func (engine *SQLiteEngine) GetByID(ctx context.Context, tableName string, recor
 		return nil, err
 	}
 
-	selectQuery := fmt.Sprintf(`SELECT * FROM %s WHERE %s = ? LIMIT 1`, quoteSQLiteIdent(tableName), quoteSQLiteIdent(pkCol))
+	selectQuery := fmt.Sprintf(`SELECT * FROM %s WHERE %s = ? LIMIT 1`, engine.QuoteIdent(tableName), engine.QuoteIdent(pkCol))
 	rows, err := engine.sqlDatabase.QueryContext(ctx, selectQuery, recordID)
 	if err != nil {
 		return nil, err
@@ -239,12 +275,12 @@ func (engine *SQLiteEngine) Insert(ctx context.Context, tableName string, record
 	valuesList := make([]any, 0, len(recordData))
 
 	for key, val := range recordData {
-		columnNames = append(columnNames, quoteSQLiteIdent(key))
+		columnNames = append(columnNames, engine.QuoteIdent(key))
 		placeholderMarks = append(placeholderMarks, "?")
 		valuesList = append(valuesList, val)
 	}
 
-	insertQuery := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s)`, quoteSQLiteIdent(tableName), strings.Join(columnNames, ", "), strings.Join(placeholderMarks, ", "))
+	insertQuery := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s)`, engine.QuoteIdent(tableName), strings.Join(columnNames, ", "), strings.Join(placeholderMarks, ", "))
 	result, err := engine.sqlDatabase.ExecContext(ctx, insertQuery, valuesList...)
 	if err != nil {
 		return nil, err
@@ -269,12 +305,12 @@ func (engine *SQLiteEngine) Update(ctx context.Context, tableName string, record
 	valuesList := make([]any, 0, len(recordData)+1)
 
 	for key, val := range recordData {
-		setAssignments = append(setAssignments, fmt.Sprintf(`%s = ?`, quoteSQLiteIdent(key)))
+		setAssignments = append(setAssignments, fmt.Sprintf(`%s = ?`, engine.QuoteIdent(key)))
 		valuesList = append(valuesList, val)
 	}
 	valuesList = append(valuesList, recordID)
 
-	updateQuery := fmt.Sprintf(`UPDATE %s SET %s WHERE %s = ?`, quoteSQLiteIdent(tableName), strings.Join(setAssignments, ", "), quoteSQLiteIdent(pkCol))
+	updateQuery := fmt.Sprintf(`UPDATE %s SET %s WHERE %s = ?`, engine.QuoteIdent(tableName), strings.Join(setAssignments, ", "), engine.QuoteIdent(pkCol))
 	_, err = engine.sqlDatabase.ExecContext(ctx, updateQuery, valuesList...)
 	if err != nil {
 		return nil, err
@@ -289,7 +325,7 @@ func (engine *SQLiteEngine) Delete(ctx context.Context, tableName string, record
 		return err
 	}
 
-	deleteQuery := fmt.Sprintf(`DELETE FROM %s WHERE %s = ?`, quoteSQLiteIdent(tableName), quoteSQLiteIdent(pkCol))
+	deleteQuery := fmt.Sprintf(`DELETE FROM %s WHERE %s = ?`, engine.QuoteIdent(tableName), engine.QuoteIdent(pkCol))
 	_, err = engine.sqlDatabase.ExecContext(ctx, deleteQuery, recordID)
 	return err
 }

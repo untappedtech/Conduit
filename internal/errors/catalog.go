@@ -78,15 +78,3 @@ var (
 		DefaultMessage: "The service is temporarily unavailable.",
 	}
 )
-
-// // slugForTitle converts an error title into a documentation slug.
-// func slugForTitle(title string) string {
-// 	slug := strings.ToLower(title)
-// 	slug = strings.ReplaceAll(slug, " ", "-")
-// 	return slug
-// }
-
-// // DocumentationURL builds the full documentation URL for an error.
-// func DocumentationURL(title string) string {
-// 	return fmt.Sprintf("https://conduit.untapped.tech/docs/errors/%s", slugForTitle(title))
-// }

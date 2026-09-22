@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/untappedtech/conduit/internal/domain"
+	"github.com/untappedtech/conduit/internal/service"
 )
 
 type MemoryDB struct {
@@ -98,7 +100,7 @@ func (memoryDatabase *MemoryDB) GetByID(ctx context.Context, tableName string, r
 	return nil, domain.ErrNotFound
 }
 
-func (memoryDatabase *MemoryDB) List(ctx context.Context, tableName string, queryLimit int, queryOffset int) ([]map[string]any, error) {
+func (memoryDatabase *MemoryDB) List(ctx context.Context, tableName string, req domain.ListRequest) ([]map[string]any, error) {
 	memoryDatabase.mutex.RLock()
 	defer memoryDatabase.mutex.RUnlock()
 
@@ -107,44 +109,81 @@ func (memoryDatabase *MemoryDB) List(ctx context.Context, tableName string, quer
 		return nil, domain.ErrNotFound
 	}
 
-	allRows := targetTable.Rows
-
-	// Offset beyond range → empty slice
-	if queryOffset >= len(allRows) {
-		return []map[string]any{}, nil
-	}
-
-	// Unlimited mode: limit < 0 means "return all rows starting at offset"
-	if queryLimit < 0 {
-		slicedRows := allRows[queryOffset:]
-		outputRows := make([]map[string]any, len(slicedRows))
-		for index, currentRow := range slicedRows {
-			clonedRow := make(map[string]any)
-			for key, val := range currentRow {
-				clonedRow[key] = val
-			}
-			outputRows[index] = clonedRow
+	var matchedRows []map[string]any
+	if req.Where != "" {
+		expr, err := service.ParseWhere(req.Where, targetTable.Columns)
+		if err != nil {
+			return nil, err
 		}
-		return outputRows, nil
+		if expr != nil {
+			for _, row := range targetTable.Rows {
+				if expr.Eval(row) {
+					matchedRows = append(matchedRows, row)
+				}
+			}
+		} else {
+			matchedRows = targetTable.Rows
+		}
+	} else {
+		matchedRows = targetTable.Rows
 	}
 
-	// Normal bounded mode
-	endIndex := queryOffset + queryLimit
-	if endIndex > len(allRows) {
-		endIndex = len(allRows)
-	}
-
-	slicedRows := allRows[queryOffset:endIndex]
-	outputRows := make([]map[string]any, len(slicedRows))
-	for index, currentRow := range slicedRows {
-		clonedRow := make(map[string]any)
+	outputRows := make([]map[string]any, len(matchedRows))
+	for index, currentRow := range matchedRows {
+		clonedRow := make(map[string]any, len(currentRow))
 		for key, val := range currentRow {
 			clonedRow[key] = val
 		}
 		outputRows[index] = clonedRow
 	}
 
-	return outputRows, nil
+	if req.Order != "" {
+		col, desc, err := service.ValidateOrder(req.Order, targetTable.Columns)
+		if err != nil {
+			return nil, err
+		}
+		if col != "" {
+			sort.SliceStable(outputRows, func(i, j int) bool {
+				valI := outputRows[i][col]
+				valJ := outputRows[j][col]
+				if valI == nil && valJ == nil {
+					return false
+				}
+				if valI == nil {
+					return !desc
+				}
+				if valJ == nil {
+					return desc
+				}
+				cmp, ok := service.CompareValues(valI, valJ)
+				if !ok {
+					return false
+				}
+				if desc {
+					return cmp > 0
+				}
+				return cmp < 0
+			})
+		}
+	}
+
+	// Offset beyond range → empty slice
+	if req.Offset >= len(outputRows) {
+		return []map[string]any{}, nil
+	}
+
+	// Unlimited mode: limit < 0 means "return all rows starting at offset"
+	if req.Limit < 0 {
+		return outputRows[req.Offset:], nil
+	}
+
+	// Normal bounded mode
+	endIndex := req.Offset + req.Limit
+	if endIndex > len(outputRows) {
+		endIndex = len(outputRows)
+	}
+
+	return outputRows[req.Offset:endIndex], nil
 }
 
 func (memoryDatabase *MemoryDB) Update(ctx context.Context, tableName string, recordID string, recordData map[string]any) (map[string]any, error) {

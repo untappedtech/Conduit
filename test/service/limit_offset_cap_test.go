@@ -29,7 +29,7 @@ func TestLimitOffsetListing_ServerCap(t *testing.T) {
 		}
 	}
 
-	listCap, _ := api.List(ctx, "items", 10, 0)
+	listCap, _ := api.List(ctx, "items", domain.ListRequest{Limit: 10, Offset: 0})
 	if len(listCap) != 3 {
 		t.Fatalf("expected 3 items, got %d", len(listCap))
 	}

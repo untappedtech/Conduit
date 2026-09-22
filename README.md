@@ -210,12 +210,23 @@ Every table becomes an endpoint:
 | Method | Path                 | Description        |
 | ------ | -------------------- | ------------------ |
 | GET    | `/v1/sports`         | List rows          |
+| GET    | `/v1/sports`         | List rows (supports `limit`, `offset`, `order`, `where`, `format`) |
 | GET    | `/v1/sports/<id>`    | Fetch a single row |
 | POST   | `/v1/sports`         | Insert a new row   |
 | PUT    | `/v1/sports/<id>`    | Replace a row      |
 | PATCH  | `/v1/sports/<id>`    | Update fields      |
 | DELETE | `/v1/sports/<id>`    | Delete a row       |
 | POST   | `/v1/schema/<table>` | Create a new table |
+
+### Query Parameters (`GET /v1/<table>`)
+
+- **`limit`**: Maximum number of rows to return. Setting `limit=0` returns all matching rows (unlimited).
+- **`offset`**: Number of rows to skip before returning results.
+- **`order`**: Sort by column: `?order=name:asc`, `?order=players:desc`, or `?order=name`.
+- **`where`**: Filter using SQL-like expressions: `?where=players > 5 AND name LIKE '%ball%'`.
+  - Operators: `=`, `!=`, `<`, `>`, `<=`, `>=`, `LIKE`, `IN`, `IS NULL`, `IS NOT NULL`, `AND`, `OR`, `NOT`.
+  - Grouping with parentheses: `?where=(status = 'active' OR role = 'admin') AND age >= 21`.
+- **`format`**: Response format (`json`, `ndjson`, `yaml`, `toml`, `xml`, `csv`, `cbor`).
 
 ---
 

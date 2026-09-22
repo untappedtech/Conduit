@@ -9,6 +9,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/untappedtech/conduit/internal/domain"
+	"github.com/untappedtech/conduit/internal/service"
 )
 
 var validMySQLIdent = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
@@ -28,8 +29,12 @@ func NewMySQLEngine(dataSourceName string) (domain.DatabaseDriver, error) {
 	return &MySQLEngine{sqlDatabase: dbConn}, nil
 }
 
-func quoteMySQLIdent(identifier string) string {
+func (engine *MySQLEngine) QuoteIdent(identifier string) string {
 	return "`" + strings.ReplaceAll(identifier, "`", "``") + "`"
+}
+
+func (engine *MySQLEngine) Placeholder(index int) string {
+	return "?"
 }
 
 func (engine *MySQLEngine) Schema(ctx context.Context, tableName string) ([]domain.ColumnDef, error) {
@@ -37,7 +42,7 @@ func (engine *MySQLEngine) Schema(ctx context.Context, tableName string) ([]doma
 		return nil, domain.ErrInvalidID
 	}
 
-	query := fmt.Sprintf(`DESCRIBE %s;`, quoteMySQLIdent(tableName))
+	query := fmt.Sprintf(`DESCRIBE %s;`, engine.QuoteIdent(tableName))
 	rows, err := engine.sqlDatabase.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -133,7 +138,7 @@ func (engine *MySQLEngine) CreateTable(ctx context.Context, tableName string, co
 		if !validMySQLIdent.MatchString(col.Name) {
 			return fmt.Errorf("invalid column name: %s", col.Name)
 		}
-		colSQL := fmt.Sprintf("%s %s", quoteMySQLIdent(col.Name), strings.ToUpper(col.Type))
+		colSQL := fmt.Sprintf("%s %s", engine.QuoteIdent(col.Name), strings.ToUpper(col.Type))
 
 		if col.PK != nil && *col.PK {
 			if col.Autoincrement != nil && *col.Autoincrement {
@@ -148,7 +153,7 @@ func (engine *MySQLEngine) CreateTable(ctx context.Context, tableName string, co
 		columnDeclarations = append(columnDeclarations, colSQL)
 	}
 
-	query := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (%s);`, quoteMySQLIdent(tableName), strings.Join(columnDeclarations, ", "))
+	query := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (%s);`, engine.QuoteIdent(tableName), strings.Join(columnDeclarations, ", "))
 	_, err := engine.sqlDatabase.ExecContext(ctx, query)
 	return err
 }
@@ -157,31 +162,62 @@ func (engine *MySQLEngine) DropTable(ctx context.Context, tableName string) erro
 	if !validMySQLIdent.MatchString(tableName) {
 		return domain.ErrInvalidID
 	}
-	_, err := engine.sqlDatabase.ExecContext(ctx, fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, quoteMySQLIdent(tableName)))
+	_, err := engine.sqlDatabase.ExecContext(ctx, fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, engine.QuoteIdent(tableName)))
 	return err
 }
 
-func (engine *MySQLEngine) List(ctx context.Context, tableName string, queryLimit int, queryOffset int) ([]map[string]any, error) {
+func (engine *MySQLEngine) List(ctx context.Context, tableName string, req domain.ListRequest) ([]map[string]any, error) {
 	if !validMySQLIdent.MatchString(tableName) {
 		return nil, domain.ErrInvalidID
 	}
 
-	var (
-		query string
-		rows  *sql.Rows
-		err   error
-	)
+	query := fmt.Sprintf("SELECT * FROM %s", engine.QuoteIdent(tableName))
+	args := []any{}
 
-	// Unlimited mode: limit < 0 → no LIMIT clause
-	if queryLimit < 0 {
-		query = fmt.Sprintf(`SELECT * FROM %s OFFSET ?`, quoteMySQLIdent(tableName))
-		rows, err = engine.sqlDatabase.QueryContext(ctx, query, queryOffset)
-	} else {
-		// Normal bounded mode
-		query = fmt.Sprintf(`SELECT * FROM %s LIMIT ? OFFSET ?`, quoteMySQLIdent(tableName))
-		rows, err = engine.sqlDatabase.QueryContext(ctx, query, queryLimit, queryOffset)
+	if req.Where != "" {
+		cols, err := engine.Schema(ctx, tableName)
+		if err != nil {
+			return nil, err
+		}
+		whereSQL, whereArgs, err := service.ParseWhereSQL(req.Where, cols, engine, 1)
+		if err != nil {
+			return nil, err
+		}
+		if whereSQL != "" {
+			query += " WHERE " + whereSQL
+			args = append(args, whereArgs...)
+		}
 	}
 
+	if req.Order != "" {
+		cols, err := engine.Schema(ctx, tableName)
+		if err != nil {
+			return nil, err
+		}
+		col, desc, err := service.ValidateOrder(req.Order, cols)
+		if err != nil {
+			return nil, err
+		}
+		if col != "" {
+			if desc {
+				query += fmt.Sprintf(" ORDER BY %s DESC", engine.QuoteIdent(col))
+			} else {
+				query += fmt.Sprintf(" ORDER BY %s ASC", engine.QuoteIdent(col))
+			}
+		}
+	}
+
+	// Unlimited mode: req.Limit < 0 → no LIMIT clause
+	if req.Limit < 0 {
+		query += " OFFSET ?"
+		args = append(args, req.Offset)
+	} else {
+		// Normal bounded mode
+		query += " LIMIT ? OFFSET ?"
+		args = append(args, req.Limit, req.Offset)
+	}
+
+	rows, err := engine.sqlDatabase.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +232,7 @@ func (engine *MySQLEngine) GetByID(ctx context.Context, tableName string, record
 		return nil, err
 	}
 
-	query := fmt.Sprintf(`SELECT * FROM %s WHERE %s = ? LIMIT 1`, quoteMySQLIdent(tableName), quoteMySQLIdent(pkCol))
+	query := fmt.Sprintf(`SELECT * FROM %s WHERE %s = ? LIMIT 1`, engine.QuoteIdent(tableName), engine.QuoteIdent(pkCol))
 	rows, err := engine.sqlDatabase.QueryContext(ctx, query, recordID)
 	if err != nil {
 		return nil, err
@@ -216,12 +252,12 @@ func (engine *MySQLEngine) Insert(ctx context.Context, tableName string, recordD
 	valuesList := make([]any, 0, len(recordData))
 
 	for key, val := range recordData {
-		columnNames = append(columnNames, quoteMySQLIdent(key))
+		columnNames = append(columnNames, engine.QuoteIdent(key))
 		placeholderMarks = append(placeholderMarks, "?")
 		valuesList = append(valuesList, val)
 	}
 
-	query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s);`, quoteMySQLIdent(tableName), strings.Join(columnNames, ", "), strings.Join(placeholderMarks, ", "))
+	query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s);`, engine.QuoteIdent(tableName), strings.Join(columnNames, ", "), strings.Join(placeholderMarks, ", "))
 	result, err := engine.sqlDatabase.ExecContext(ctx, query, valuesList...)
 	if err != nil {
 		return nil, err
@@ -246,12 +282,12 @@ func (engine *MySQLEngine) Update(ctx context.Context, tableName string, recordI
 	valuesList := make([]any, 0, len(recordData)+1)
 
 	for key, val := range recordData {
-		setAssignments = append(setAssignments, fmt.Sprintf(`%s = ?`, quoteMySQLIdent(key)))
+		setAssignments = append(setAssignments, fmt.Sprintf(`%s = ?`, engine.QuoteIdent(key)))
 		valuesList = append(valuesList, val)
 	}
 	valuesList = append(valuesList, recordID)
 
-	query := fmt.Sprintf(`UPDATE %s SET %s WHERE %s = ?;`, quoteMySQLIdent(tableName), strings.Join(setAssignments, ", "), quoteMySQLIdent(pkCol))
+	query := fmt.Sprintf(`UPDATE %s SET %s WHERE %s = ?;`, engine.QuoteIdent(tableName), strings.Join(setAssignments, ", "), engine.QuoteIdent(pkCol))
 	_, err = engine.sqlDatabase.ExecContext(ctx, query, valuesList...)
 	if err != nil {
 		return nil, err
@@ -266,7 +302,7 @@ func (engine *MySQLEngine) Delete(ctx context.Context, tableName string, recordI
 		return err
 	}
 
-	query := fmt.Sprintf(`DELETE FROM %s WHERE %s = ?;`, quoteMySQLIdent(tableName), quoteMySQLIdent(pkCol))
+	query := fmt.Sprintf(`DELETE FROM %s WHERE %s = ?;`, engine.QuoteIdent(tableName), engine.QuoteIdent(pkCol))
 	_, err = engine.sqlDatabase.ExecContext(ctx, query, recordID)
 	return err
 }

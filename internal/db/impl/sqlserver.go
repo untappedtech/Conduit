@@ -9,6 +9,7 @@ import (
 
 	_ "github.com/microsoft/go-mssqldb"
 	"github.com/untappedtech/conduit/internal/domain"
+	"github.com/untappedtech/conduit/internal/service"
 )
 
 var validSQLServerIdent = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
@@ -28,8 +29,12 @@ func NewSQLServerEngine(dataSourceName string) (domain.DatabaseDriver, error) {
 	return &SQLServerEngine{sqlDatabase: dbConn}, nil
 }
 
-func quoteSQLServerIdent(identifier string) string {
+func (engine *SQLServerEngine) QuoteIdent(identifier string) string {
 	return "[" + strings.ReplaceAll(identifier, "]", "]]") + "]"
+}
+
+func (engine *SQLServerEngine) Placeholder(index int) string {
+	return fmt.Sprintf("@p%d", index)
 }
 
 func (engine *SQLServerEngine) Schema(ctx context.Context, tableName string) ([]domain.ColumnDef, error) {
@@ -156,11 +161,11 @@ func (engine *SQLServerEngine) CreateTable(ctx context.Context, tableName string
 		if !validSQLServerIdent.MatchString(col.Name) {
 			return fmt.Errorf("invalid column name: %s", col.Name)
 		}
-		colSQL := fmt.Sprintf("%s %s", quoteSQLServerIdent(col.Name), strings.ToUpper(col.Type))
+		colSQL := fmt.Sprintf("%s %s", engine.QuoteIdent(col.Name), strings.ToUpper(col.Type))
 
 		if col.PK != nil && *col.PK {
 			if col.Autoincrement != nil && *col.Autoincrement {
-				colSQL = fmt.Sprintf("%s INT IDENTITY(1,1) PRIMARY KEY", quoteSQLServerIdent(col.Name))
+				colSQL = fmt.Sprintf("%s INT IDENTITY(1,1) PRIMARY KEY", engine.QuoteIdent(col.Name))
 			} else {
 				colSQL += " PRIMARY KEY"
 			}
@@ -180,8 +185,8 @@ func (engine *SQLServerEngine) CreateTable(ctx context.Context, tableName string
 			CREATE TABLE %s (%s);
 		END;
 		`,
-		quoteSQLServerIdent(tableName),         // OBJECT_ID lookup
-		quoteSQLServerIdent(tableName),         // CREATE TABLE name
+		engine.QuoteIdent(tableName),         // OBJECT_ID lookup
+		engine.QuoteIdent(tableName),         // CREATE TABLE name
 		strings.Join(columnDeclarations, ", "), // column definitions
 	)
 
@@ -196,38 +201,69 @@ func (engine *SQLServerEngine) DropTable(ctx context.Context, tableName string) 
 	query := fmt.Sprintf(`IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'%s') AND type in (N'U'))
 	BEGIN
 		DROP TABLE %s;
-	END;`, quoteSQLServerIdent(tableName), quoteSQLServerIdent(tableName))
+	END;`, engine.QuoteIdent(tableName), engine.QuoteIdent(tableName))
 	_, err := engine.sqlDatabase.ExecContext(ctx, query)
 	return err
 }
 
-func (engine *SQLServerEngine) List(ctx context.Context, tableName string, queryLimit int, queryOffset int) ([]map[string]any, error) {
+func (engine *SQLServerEngine) List(ctx context.Context, tableName string, req domain.ListRequest) ([]map[string]any, error) {
 	if !validSQLServerIdent.MatchString(tableName) {
 		return nil, domain.ErrInvalidID
 	}
 
-	var (
-		query string
-		rows  *sql.Rows
-		err   error
-	)
+	query := fmt.Sprintf("SELECT * FROM %s", engine.QuoteIdent(tableName))
+	args := []any{}
 
-	// Unlimited mode: limit < 0 → omit FETCH clause
-	if queryLimit < 0 {
-		query = fmt.Sprintf(
-			`SELECT * FROM %s ORDER BY (SELECT NULL) OFFSET @p1 ROWS`,
-			quoteSQLServerIdent(tableName),
-		)
-		rows, err = engine.sqlDatabase.QueryContext(ctx, query, queryOffset)
-	} else {
-		// Normal bounded mode
-		query = fmt.Sprintf(
-			`SELECT * FROM %s ORDER BY (SELECT NULL) OFFSET @p1 ROWS FETCH NEXT @p2 ROWS ONLY`,
-			quoteSQLServerIdent(tableName),
-		)
-		rows, err = engine.sqlDatabase.QueryContext(ctx, query, queryOffset, queryLimit)
+	if req.Where != "" {
+		cols, err := engine.Schema(ctx, tableName)
+		if err != nil {
+			return nil, err
+		}
+		whereSQL, whereArgs, err := service.ParseWhereSQL(req.Where, cols, engine, 1)
+		if err != nil {
+			return nil, err
+		}
+		if whereSQL != "" {
+			query += " WHERE " + whereSQL
+			args = append(args, whereArgs...)
+		}
 	}
 
+	orderClause := "ORDER BY (SELECT NULL)"
+	if req.Order != "" {
+		cols, err := engine.Schema(ctx, tableName)
+		if err != nil {
+			return nil, err
+		}
+		col, desc, err := service.ValidateOrder(req.Order, cols)
+		if err != nil {
+			return nil, err
+		}
+		if col != "" {
+			if desc {
+				orderClause = fmt.Sprintf("ORDER BY %s DESC", engine.QuoteIdent(col))
+			} else {
+				orderClause = fmt.Sprintf("ORDER BY %s ASC", engine.QuoteIdent(col))
+			}
+		}
+	}
+
+	query += " " + orderClause
+
+	// Unlimited mode: limit < 0 → omit FETCH clause
+	if req.Limit < 0 {
+		offsetParam := fmt.Sprintf("@p%d", 1+len(args))
+		query += fmt.Sprintf(" OFFSET %s ROWS", offsetParam)
+		args = append(args, req.Offset)
+	} else {
+		// Normal bounded mode
+		offsetParam := fmt.Sprintf("@p%d", 1+len(args))
+		limitParam := fmt.Sprintf("@p%d", 2+len(args))
+		query += fmt.Sprintf(" OFFSET %s ROWS FETCH NEXT %s ROWS ONLY", offsetParam, limitParam)
+		args = append(args, req.Offset, req.Limit)
+	}
+
+	rows, err := engine.sqlDatabase.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +278,7 @@ func (engine *SQLServerEngine) GetByID(ctx context.Context, tableName string, re
 		return nil, err
 	}
 
-	query := fmt.Sprintf(`SELECT TOP 1 * FROM %s WHERE %s = @p1`, quoteSQLServerIdent(tableName), quoteSQLServerIdent(pkCol))
+	query := fmt.Sprintf(`SELECT TOP 1 * FROM %s WHERE %s = @p1`, engine.QuoteIdent(tableName), engine.QuoteIdent(pkCol))
 	rows, err := engine.sqlDatabase.QueryContext(ctx, query, recordID)
 	if err != nil {
 		return nil, err
@@ -263,13 +299,13 @@ func (engine *SQLServerEngine) Insert(ctx context.Context, tableName string, rec
 
 	paramIndex := 1
 	for key, val := range recordData {
-		columnNames = append(columnNames, quoteSQLServerIdent(key))
+		columnNames = append(columnNames, engine.QuoteIdent(key))
 		placeholderMarks = append(placeholderMarks, fmt.Sprintf("@p%d", paramIndex))
 		valuesList = append(valuesList, val)
 		paramIndex++
 	}
 
-	query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s);`, quoteSQLServerIdent(tableName), strings.Join(columnNames, ", "), strings.Join(placeholderMarks, ", "))
+	query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s);`, engine.QuoteIdent(tableName), strings.Join(columnNames, ", "), strings.Join(placeholderMarks, ", "))
 	_, err := engine.sqlDatabase.ExecContext(ctx, query, valuesList...)
 	if err != nil {
 		return nil, err
@@ -289,13 +325,13 @@ func (engine *SQLServerEngine) Update(ctx context.Context, tableName string, rec
 
 	paramIndex := 1
 	for key, val := range recordData {
-		setAssignments = append(setAssignments, fmt.Sprintf(`%s = @p%d`, quoteSQLServerIdent(key), paramIndex))
+		setAssignments = append(setAssignments, fmt.Sprintf(`%s = @p%d`, engine.QuoteIdent(key), paramIndex))
 		valuesList = append(valuesList, val)
 		paramIndex++
 	}
 	valuesList = append(valuesList, recordID)
 
-	query := fmt.Sprintf(`UPDATE %s SET %s WHERE %s = @p%d;`, quoteSQLServerIdent(tableName), strings.Join(setAssignments, ", "), quoteSQLServerIdent(pkCol), paramIndex)
+	query := fmt.Sprintf(`UPDATE %s SET %s WHERE %s = @p%d;`, engine.QuoteIdent(tableName), strings.Join(setAssignments, ", "), engine.QuoteIdent(pkCol), paramIndex)
 	_, err = engine.sqlDatabase.ExecContext(ctx, query, valuesList...)
 	if err != nil {
 		return nil, err
@@ -310,7 +346,7 @@ func (engine *SQLServerEngine) Delete(ctx context.Context, tableName string, rec
 		return err
 	}
 
-	query := fmt.Sprintf(`DELETE FROM %s WHERE %s = @p1;`, quoteSQLServerIdent(tableName), quoteSQLServerIdent(pkCol))
+	query := fmt.Sprintf(`DELETE FROM %s WHERE %s = @p1;`, engine.QuoteIdent(tableName), engine.QuoteIdent(pkCol))
 	_, err = engine.sqlDatabase.ExecContext(ctx, query, recordID)
 	return err
 }

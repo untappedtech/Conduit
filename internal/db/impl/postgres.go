@@ -9,6 +9,7 @@ import (
 
 	_ "github.com/lib/pq"
 	"github.com/untappedtech/conduit/internal/domain"
+	"github.com/untappedtech/conduit/internal/service"
 )
 
 var validPostgresIdent = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
@@ -28,8 +29,12 @@ func NewPostgresEngine(dataSourceName string) (domain.DatabaseDriver, error) {
 	return &PostgresEngine{sqlDatabase: dbConn}, nil
 }
 
-func quotePostgresIdent(identifier string) string {
+func (engine *PostgresEngine) QuoteIdent(identifier string) string {
 	return `"` + strings.ReplaceAll(identifier, `"`, `""`) + `"`
+}
+
+func (engine *PostgresEngine) Placeholder(index int) string {
+	return fmt.Sprintf("$%d", index)
 }
 
 func (engine *PostgresEngine) Schema(ctx context.Context, tableName string) ([]domain.ColumnDef, error) {
@@ -156,11 +161,11 @@ func (engine *PostgresEngine) CreateTable(ctx context.Context, tableName string,
 		if !validPostgresIdent.MatchString(col.Name) {
 			return fmt.Errorf("invalid column name: %s", col.Name)
 		}
-		colSQL := fmt.Sprintf("%s %s", quotePostgresIdent(col.Name), strings.ToUpper(col.Type))
+		colSQL := fmt.Sprintf("%s %s", engine.QuoteIdent(col.Name), strings.ToUpper(col.Type))
 
 		if col.PK != nil && *col.PK {
 			if col.Autoincrement != nil && *col.Autoincrement {
-				colSQL = fmt.Sprintf("%s SERIAL PRIMARY KEY", quotePostgresIdent(col.Name))
+				colSQL = fmt.Sprintf("%s SERIAL PRIMARY KEY", engine.QuoteIdent(col.Name))
 			} else {
 				colSQL += " PRIMARY KEY"
 			}
@@ -171,7 +176,7 @@ func (engine *PostgresEngine) CreateTable(ctx context.Context, tableName string,
 		columnDeclarations = append(columnDeclarations, colSQL)
 	}
 
-	query := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (%s);`, quotePostgresIdent(tableName), strings.Join(columnDeclarations, ", "))
+	query := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (%s);`, engine.QuoteIdent(tableName), strings.Join(columnDeclarations, ", "))
 	_, err := engine.sqlDatabase.ExecContext(ctx, query)
 	return err
 }
@@ -180,31 +185,65 @@ func (engine *PostgresEngine) DropTable(ctx context.Context, tableName string) e
 	if !validPostgresIdent.MatchString(tableName) {
 		return domain.ErrInvalidID
 	}
-	_, err := engine.sqlDatabase.ExecContext(ctx, fmt.Sprintf(`DROP TABLE IF EXISTS %s CASCADE;`, quotePostgresIdent(tableName)))
+	_, err := engine.sqlDatabase.ExecContext(ctx, fmt.Sprintf(`DROP TABLE IF EXISTS %s CASCADE;`, engine.QuoteIdent(tableName)))
 	return err
 }
 
-func (engine *PostgresEngine) List(ctx context.Context, tableName string, queryLimit int, queryOffset int) ([]map[string]any, error) {
+func (engine *PostgresEngine) List(ctx context.Context, tableName string, req domain.ListRequest) ([]map[string]any, error) {
 	if !validPostgresIdent.MatchString(tableName) {
 		return nil, domain.ErrInvalidID
 	}
 
-	var (
-		query string
-		rows  *sql.Rows
-		err   error
-	)
+	query := fmt.Sprintf("SELECT * FROM %s", engine.QuoteIdent(tableName))
+	args := []any{}
 
-	// Unlimited mode: limit < 0 → no LIMIT clause
-	if queryLimit < 0 {
-		query = fmt.Sprintf(`SELECT * FROM %s OFFSET $1`, quotePostgresIdent(tableName))
-		rows, err = engine.sqlDatabase.QueryContext(ctx, query, queryOffset)
-	} else {
-		// Normal bounded mode
-		query = fmt.Sprintf(`SELECT * FROM %s LIMIT $1 OFFSET $2`, quotePostgresIdent(tableName))
-		rows, err = engine.sqlDatabase.QueryContext(ctx, query, queryLimit, queryOffset)
+	if req.Where != "" {
+		cols, err := engine.Schema(ctx, tableName)
+		if err != nil {
+			return nil, err
+		}
+		whereSQL, whereArgs, err := service.ParseWhereSQL(req.Where, cols, engine, 1)
+		if err != nil {
+			return nil, err
+		}
+		if whereSQL != "" {
+			query += " WHERE " + whereSQL
+			args = append(args, whereArgs...)
+		}
 	}
 
+	if req.Order != "" {
+		cols, err := engine.Schema(ctx, tableName)
+		if err != nil {
+			return nil, err
+		}
+		col, desc, err := service.ValidateOrder(req.Order, cols)
+		if err != nil {
+			return nil, err
+		}
+		if col != "" {
+			if desc {
+				query += fmt.Sprintf(" ORDER BY %s DESC", engine.QuoteIdent(col))
+			} else {
+				query += fmt.Sprintf(" ORDER BY %s ASC", engine.QuoteIdent(col))
+			}
+		}
+	}
+
+	// Unlimited mode: req.Limit < 0 → no LIMIT clause
+	if req.Limit < 0 {
+		offsetParam := fmt.Sprintf("$%d", 1+len(args))
+		query += fmt.Sprintf(" OFFSET %s", offsetParam)
+		args = append(args, req.Offset)
+	} else {
+		// Normal bounded mode
+		limitParam := fmt.Sprintf("$%d", 1+len(args))
+		offsetParam := fmt.Sprintf("$%d", 2+len(args))
+		query += fmt.Sprintf(" LIMIT %s OFFSET %s", limitParam, offsetParam)
+		args = append(args, req.Limit, req.Offset)
+	}
+
+	rows, err := engine.sqlDatabase.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +258,7 @@ func (engine *PostgresEngine) GetByID(ctx context.Context, tableName string, rec
 		return nil, err
 	}
 
-	query := fmt.Sprintf(`SELECT * FROM %s WHERE %s = $1 LIMIT 1`, quotePostgresIdent(tableName), quotePostgresIdent(pkCol))
+	query := fmt.Sprintf(`SELECT * FROM %s WHERE %s = $1 LIMIT 1`, engine.QuoteIdent(tableName), engine.QuoteIdent(pkCol))
 	rows, err := engine.sqlDatabase.QueryContext(ctx, query, recordID)
 	if err != nil {
 		return nil, err
@@ -240,13 +279,13 @@ func (engine *PostgresEngine) Insert(ctx context.Context, tableName string, reco
 
 	paramIndex := 1
 	for key, val := range recordData {
-		columnNames = append(columnNames, quotePostgresIdent(key))
+		columnNames = append(columnNames, engine.QuoteIdent(key))
 		placeholderMarks = append(placeholderMarks, fmt.Sprintf("$%d", paramIndex))
 		valuesList = append(valuesList, val)
 		paramIndex++
 	}
 
-	query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s) RETURNING *;`, quotePostgresIdent(tableName), strings.Join(columnNames, ", "), strings.Join(placeholderMarks, ", "))
+	query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s) RETURNING *;`, engine.QuoteIdent(tableName), strings.Join(columnNames, ", "), strings.Join(placeholderMarks, ", "))
 	rows, err := engine.sqlDatabase.QueryContext(ctx, query, valuesList...)
 	if err != nil {
 		return nil, err
@@ -271,13 +310,13 @@ func (engine *PostgresEngine) Update(ctx context.Context, tableName string, reco
 
 	paramIndex := 1
 	for key, val := range recordData {
-		setAssignments = append(setAssignments, fmt.Sprintf(`%s = $%d`, quotePostgresIdent(key), paramIndex))
+		setAssignments = append(setAssignments, fmt.Sprintf(`%s = $%d`, engine.QuoteIdent(key), paramIndex))
 		valuesList = append(valuesList, val)
 		paramIndex++
 	}
 	valuesList = append(valuesList, recordID)
 
-	query := fmt.Sprintf(`UPDATE %s SET %s WHERE %s = $%d RETURNING *;`, quotePostgresIdent(tableName), strings.Join(setAssignments, ", "), quotePostgresIdent(pkCol), paramIndex)
+	query := fmt.Sprintf(`UPDATE %s SET %s WHERE %s = $%d RETURNING *;`, engine.QuoteIdent(tableName), strings.Join(setAssignments, ", "), engine.QuoteIdent(pkCol), paramIndex)
 	rows, err := engine.sqlDatabase.QueryContext(ctx, query, valuesList...)
 	if err != nil {
 		return nil, err
@@ -297,7 +336,7 @@ func (engine *PostgresEngine) Delete(ctx context.Context, tableName string, reco
 		return err
 	}
 
-	query := fmt.Sprintf(`DELETE FROM %s WHERE %s = $1;`, quotePostgresIdent(tableName), quotePostgresIdent(pkCol))
+	query := fmt.Sprintf(`DELETE FROM %s WHERE %s = $1;`, engine.QuoteIdent(tableName), engine.QuoteIdent(pkCol))
 	_, err = engine.sqlDatabase.ExecContext(ctx, query, recordID)
 	return err
 }

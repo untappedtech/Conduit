@@ -27,7 +27,7 @@ func TestLimitOffsetBoundaries(t *testing.T) {
 		api.Insert(ctx, "bounds", map[string]any{"name": "n" + strconv.Itoa(i)})
 	}
 
-	listOffset, _ := api.List(ctx, "bounds", 5, 10)
+	listOffset, _ := api.List(ctx, "bounds", domain.ListRequest{Limit: 5, Offset: 10})
 	if len(listOffset) != 0 {
 		t.Fatalf("expected 0 items, got %d", len(listOffset))
 	}

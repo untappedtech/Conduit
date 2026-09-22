@@ -31,13 +31,20 @@ type XMLTableList struct {
 	Tables  []string `xml:"table"`
 }
 
+type ListRequest struct {
+	Limit  int
+	Offset int
+	Order  string
+	Where  string
+}
+
 type DatabaseDriver interface {
 	Schema(ctx context.Context, tableName string) ([]ColumnDef, error)
 	ListTables(ctx context.Context) ([]string, error)
 	CreateTable(ctx context.Context, tableName string, columns []ColumnDef) error
 	DropTable(ctx context.Context, tableName string) error
 
-	List(ctx context.Context, tableName string, queryLimit int, queryOffset int) ([]map[string]any, error)
+	List(ctx context.Context, tableName string, req ListRequest) ([]map[string]any, error)
 	GetByID(ctx context.Context, tableName string, recordID string) (map[string]any, error)
 	Insert(ctx context.Context, tableName string, recordData map[string]any) (map[string]any, error)
 	Update(ctx context.Context, tableName string, recordID string, recordData map[string]any) (map[string]any, error)
