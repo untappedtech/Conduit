@@ -1,0 +1,385 @@
+package impl
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"regexp"
+	"strings"
+
+	_ "github.com/sijms/go-ora/v2"
+	"github.com/untappedtech/conduit/internal/domain"
+	"github.com/untappedtech/conduit/internal/service"
+)
+
+var validOracleIdent = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+type OracleEngine struct {
+	sqlDatabase *sql.DB
+}
+
+func NewOracleEngine(dataSourceName string) (domain.DatabaseDriver, error) {
+	dbConn, err := sql.Open("oracle", dataSourceName)
+	if err != nil {
+		return nil, err
+	}
+	if err := dbConn.Ping(); err != nil {
+		return nil, err
+	}
+	return &OracleEngine{sqlDatabase: dbConn}, nil
+}
+
+func (engine *OracleEngine) QuoteIdent(identifier string) string {
+	return `"` + strings.ReplaceAll(identifier, `"`, `""`) + `"`
+}
+
+func (engine *OracleEngine) Placeholder(index int) string {
+	return fmt.Sprintf(":%d", index)
+}
+
+func (engine *OracleEngine) Schema(ctx context.Context, tableName string) ([]domain.ColumnDef, error) {
+	if !validOracleIdent.MatchString(tableName) {
+		return nil, domain.ErrInvalidID
+	}
+
+	pkMap, _ := engine.getPKMap(ctx, tableName)
+
+	query := `SELECT column_name, data_type, nullable, data_default, identity_column 
+		FROM user_tab_cols 
+		WHERE UPPER(table_name) = UPPER(:1) 
+		ORDER BY column_id`
+
+	rows, err := engine.sqlDatabase.QueryContext(ctx, query, tableName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var columnDefinitions []domain.ColumnDef
+	cid := 0
+	for rows.Next() {
+		var colName, colType, nullableStr string
+		var dataDefault, identityCol sql.NullString
+
+		if err := rows.Scan(&colName, &colType, &nullableStr, &dataDefault, &identityCol); err != nil {
+			return nil, err
+		}
+
+		nullable := nullableStr == "Y"
+		isPK := pkMap[strings.ToUpper(colName)]
+		cidValue := cid
+
+		col := domain.ColumnDef{
+			Name:     strings.ToLower(colName),
+			Type:     colType,
+			Nullable: &nullable,
+			PK:       &isPK,
+			CID:      &cidValue,
+		}
+		if dataDefault.Valid && dataDefault.String != "" {
+			val := strings.TrimSpace(dataDefault.String)
+			col.Default = &val
+		}
+		if identityCol.Valid && strings.ToUpper(identityCol.String) == "YES" {
+			isAuto := true
+			col.Autoincrement = &isAuto
+		}
+
+		columnDefinitions = append(columnDefinitions, col)
+		cid++
+	}
+
+	if len(columnDefinitions) == 0 {
+		return nil, domain.ErrNotFound
+	}
+	return columnDefinitions, nil
+}
+
+func (engine *OracleEngine) getPKMap(ctx context.Context, tableName string) (map[string]bool, error) {
+	query := `SELECT cc.column_name 
+		FROM user_constraints c 
+		JOIN user_cons_columns cc ON c.constraint_name = cc.constraint_name 
+		WHERE c.constraint_type = 'P' AND UPPER(c.table_name) = UPPER(:1)`
+
+	rows, err := engine.sqlDatabase.QueryContext(ctx, query, tableName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	pks := make(map[string]bool)
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err == nil {
+			pks[strings.ToUpper(name)] = true
+		}
+	}
+	return pks, nil
+}
+
+func (engine *OracleEngine) detectPK(ctx context.Context, tableName string) (string, error) {
+	cols, err := engine.Schema(ctx, tableName)
+	if err != nil {
+		return "", err
+	}
+	pkCount := 0
+	pkName := ""
+	for _, col := range cols {
+		if col.PK != nil && *col.PK {
+			pkCount++
+			pkName = col.Name
+		}
+	}
+	if pkCount != 1 {
+		return "", domain.ErrPrimaryKeyMissing
+	}
+	return pkName, nil
+}
+
+func (engine *OracleEngine) ListTables(ctx context.Context) ([]string, error) {
+	query := `SELECT table_name FROM user_tables ORDER BY table_name`
+	rows, err := engine.sqlDatabase.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tables []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err == nil {
+			tables = append(tables, strings.ToLower(name))
+		}
+	}
+	return tables, nil
+}
+
+func mapOracleType(t string) string {
+	switch strings.ToLower(strings.TrimSpace(t)) {
+	case "integer", "int":
+		return "NUMBER(19)"
+	case "text", "string", "varchar":
+		return "VARCHAR2(4000)"
+	case "real", "float", "double":
+		return "BINARY_DOUBLE"
+	case "boolean", "bool":
+		return "NUMBER(1)"
+	default:
+		return t
+	}
+}
+
+func (engine *OracleEngine) CreateTable(ctx context.Context, tableName string, columns []domain.ColumnDef) error {
+	if !validOracleIdent.MatchString(tableName) {
+		return domain.ErrInvalidID
+	}
+	if len(columns) == 0 {
+		return fmt.Errorf("at least one column required")
+	}
+
+	var columnDeclarations []string
+	for _, col := range columns {
+		if !validOracleIdent.MatchString(col.Name) {
+			return fmt.Errorf("invalid column name: %s", col.Name)
+		}
+		oraType := mapOracleType(col.Type)
+		colSQL := fmt.Sprintf("%s %s", engine.QuoteIdent(col.Name), oraType)
+
+		isPK := col.PK != nil && *col.PK
+		isAuto := col.Autoincrement != nil && *col.Autoincrement
+
+		if isAuto {
+			colSQL = fmt.Sprintf("%s NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY", engine.QuoteIdent(col.Name))
+		} else if isPK {
+			colSQL += " PRIMARY KEY"
+		}
+
+		if col.Nullable != nil && !*col.Nullable && !isPK {
+			colSQL += " NOT NULL"
+		}
+		if col.Unique != nil && *col.Unique && !isPK {
+			colSQL += " UNIQUE"
+		}
+		if col.Default != nil {
+			colSQL += fmt.Sprintf(" DEFAULT %s", *col.Default)
+		}
+
+		columnDeclarations = append(columnDeclarations, colSQL)
+	}
+
+	query := fmt.Sprintf("CREATE TABLE %s (%s)", engine.QuoteIdent(tableName), strings.Join(columnDeclarations, ", "))
+	_, err := engine.sqlDatabase.ExecContext(ctx, query)
+	return err
+}
+
+func (engine *OracleEngine) DropTable(ctx context.Context, tableName string) error {
+	if !validOracleIdent.MatchString(tableName) {
+		return domain.ErrInvalidID
+	}
+	query := fmt.Sprintf(`BEGIN
+		EXECUTE IMMEDIATE 'DROP TABLE %s CASCADE CONSTRAINTS';
+	EXCEPTION
+		WHEN OTHERS THEN
+			IF SQLCODE != -942 THEN
+				RAISE;
+			END IF;
+	END;`, engine.QuoteIdent(tableName))
+
+	_, err := engine.sqlDatabase.ExecContext(ctx, query)
+	return err
+}
+
+func (engine *OracleEngine) List(ctx context.Context, tableName string, req domain.ListRequest) ([]map[string]any, error) {
+	if !validOracleIdent.MatchString(tableName) {
+		return nil, domain.ErrInvalidID
+	}
+
+	query := fmt.Sprintf("SELECT * FROM %s", engine.QuoteIdent(tableName))
+	args := []any{}
+
+	if req.Where != "" {
+		cols, err := engine.Schema(ctx, tableName)
+		if err != nil {
+			return nil, err
+		}
+		whereSQL, whereArgs, err := service.ParseWhereSQL(req.Where, cols, engine, 1)
+		if err != nil {
+			return nil, err
+		}
+		if whereSQL != "" {
+			query += " WHERE " + whereSQL
+			args = append(args, whereArgs...)
+		}
+	}
+
+	orderClause := "ORDER BY (SELECT NULL FROM dual)"
+	if req.Order != "" {
+		cols, err := engine.Schema(ctx, tableName)
+		if err != nil {
+			return nil, err
+		}
+		col, desc, err := service.ValidateOrder(req.Order, cols)
+		if err != nil {
+			return nil, err
+		}
+		if col != "" {
+			if desc {
+				orderClause = fmt.Sprintf("ORDER BY %s DESC", engine.QuoteIdent(col))
+			} else {
+				orderClause = fmt.Sprintf("ORDER BY %s ASC", engine.QuoteIdent(col))
+			}
+		}
+	}
+
+	query += " " + orderClause
+
+	// Pagination using ANSI OFFSET / FETCH (Oracle 12c+)
+	offsetParam := fmt.Sprintf(":%d", 1+len(args))
+	if req.Limit < 0 {
+		query += fmt.Sprintf(" OFFSET %s ROWS", offsetParam)
+		args = append(args, req.Offset)
+	} else {
+		limitParam := fmt.Sprintf(":%d", 2+len(args))
+		query += fmt.Sprintf(" OFFSET %s ROWS FETCH NEXT %s ROWS ONLY", offsetParam, limitParam)
+		args = append(args, req.Offset, req.Limit)
+	}
+
+	rows, err := engine.sqlDatabase.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanRowsToMapSlice(rows)
+}
+
+func (engine *OracleEngine) GetByID(ctx context.Context, tableName string, recordID string) (map[string]any, error) {
+	pkCol, err := engine.detectPK(ctx, tableName)
+	if err != nil {
+		return nil, err
+	}
+
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s = :1 FETCH FIRST 1 ROWS ONLY", engine.QuoteIdent(tableName), engine.QuoteIdent(pkCol))
+	rows, err := engine.sqlDatabase.QueryContext(ctx, query, recordID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results, err := scanRowsToMapSlice(rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(results) == 0 {
+		return nil, domain.ErrNotFound
+	}
+	return results[0], nil
+}
+
+func (engine *OracleEngine) Insert(ctx context.Context, tableName string, recordData map[string]any) (map[string]any, error) {
+	columnNames := make([]string, 0, len(recordData))
+	placeholderMarks := make([]string, 0, len(recordData))
+	valuesList := make([]any, 0, len(recordData))
+
+	paramIndex := 1
+	for key, val := range recordData {
+		columnNames = append(columnNames, engine.QuoteIdent(key))
+		placeholderMarks = append(placeholderMarks, fmt.Sprintf(":%d", paramIndex))
+		valuesList = append(valuesList, val)
+		paramIndex++
+	}
+
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", engine.QuoteIdent(tableName), strings.Join(columnNames, ", "), strings.Join(placeholderMarks, ", "))
+	_, err := engine.sqlDatabase.ExecContext(ctx, query, valuesList...)
+	if err != nil {
+		return nil, err
+	}
+
+	return recordData, nil
+}
+
+func (engine *OracleEngine) Update(ctx context.Context, tableName string, recordID string, recordData map[string]any) (map[string]any, error) {
+	pkCol, err := engine.detectPK(ctx, tableName)
+	if err != nil {
+		return nil, err
+	}
+
+	setAssignments := make([]string, 0, len(recordData))
+	valuesList := make([]any, 0, len(recordData)+1)
+
+	paramIndex := 1
+	for key, val := range recordData {
+		setAssignments = append(setAssignments, fmt.Sprintf("%s = :%d", engine.QuoteIdent(key), paramIndex))
+		valuesList = append(valuesList, val)
+		paramIndex++
+	}
+	valuesList = append(valuesList, recordID)
+
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s = :%d", engine.QuoteIdent(tableName), strings.Join(setAssignments, ", "), engine.QuoteIdent(pkCol), paramIndex)
+	_, err = engine.sqlDatabase.ExecContext(ctx, query, valuesList...)
+	if err != nil {
+		return nil, err
+	}
+
+	return engine.GetByID(ctx, tableName, recordID)
+}
+
+func (engine *OracleEngine) Delete(ctx context.Context, tableName string, recordID string) error {
+	pkCol, err := engine.detectPK(ctx, tableName)
+	if err != nil {
+		return err
+	}
+
+	query := fmt.Sprintf("DELETE FROM %s WHERE %s = :1", engine.QuoteIdent(tableName), engine.QuoteIdent(pkCol))
+	_, err = engine.sqlDatabase.ExecContext(ctx, query, recordID)
+	return err
+}
+
+func (engine *OracleEngine) HealthCheck(ctx context.Context) error {
+	return engine.sqlDatabase.PingContext(ctx)
+}
+
+func (engine *OracleEngine) Close() error {
+	return engine.sqlDatabase.Close()
+}
+

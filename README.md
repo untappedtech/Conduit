@@ -16,7 +16,7 @@ Point it at a database, start the server, and your tables become live REST endpo
   JSON, XML, YAML, TOML, NDJSON, CSV, CBOR — all first‑class citizens.
 
 - **Database‑agnostic**  
-  Official drivers for SQLite, PostgreSQL, MySQL/MariaDB, and SQL Server.
+  Official drivers for SQLite, PostgreSQL, MySQL/MariaDB, SQL Server, libSQL/Turso, ClickHouse, and Oracle.
 
 - **Zero‑code REST API generation**  
   Every table becomes an endpoint automatically.
@@ -207,16 +207,16 @@ Authorization modules are pluggable.
 
 Every table becomes an endpoint:
 
-| Method | Path                 | Description        |
-| ------ | -------------------- | ------------------ |
-| GET    | `/v1/sports`         | List rows          |
+| Method | Path                 | Description                                                        |
+| ------ | -------------------- | ------------------------------------------------------------------ |
+| GET    | `/v1/sports`         | List rows                                                          |
 | GET    | `/v1/sports`         | List rows (supports `limit`, `offset`, `order`, `where`, `format`) |
-| GET    | `/v1/sports/<id>`    | Fetch a single row |
-| POST   | `/v1/sports`         | Insert a new row   |
-| PUT    | `/v1/sports/<id>`    | Replace a row      |
-| PATCH  | `/v1/sports/<id>`    | Update fields      |
-| DELETE | `/v1/sports/<id>`    | Delete a row       |
-| POST   | `/v1/schema/<table>` | Create a new table |
+| GET    | `/v1/sports/<id>`    | Fetch a single row                                                 |
+| POST   | `/v1/sports`         | Insert a new row                                                   |
+| PUT    | `/v1/sports/<id>`    | Replace a row                                                      |
+| PATCH  | `/v1/sports/<id>`    | Update fields                                                      |
+| DELETE | `/v1/sports/<id>`    | Delete a row                                                       |
+| POST   | `/v1/schema/<table>` | Create a new table                                                 |
 
 ### Query Parameters (`GET /v1/<table>`)
 
@@ -224,8 +224,8 @@ Every table becomes an endpoint:
 - **`offset`**: Number of rows to skip before returning results.
 - **`order`**: Sort by column: `?order=name:asc`, `?order=players:desc`, or `?order=name`.
 - **`where`**: Filter using SQL-like expressions: `?where=players > 5 AND name LIKE '%ball%'`.
-  - Operators: `=`, `!=`, `<`, `>`, `<=`, `>=`, `LIKE`, `IN`, `IS NULL`, `IS NOT NULL`, `AND`, `OR`, `NOT`.
-  - Grouping with parentheses: `?where=(status = 'active' OR role = 'admin') AND age >= 21`.
+    - Operators: `=`, `!=`, `<`, `>`, `<=`, `>=`, `LIKE`, `IN`, `IS NULL`, `IS NOT NULL`, `AND`, `OR`, `NOT`.
+    - Grouping with parentheses: `?where=(status = 'active' OR role = 'admin') AND age >= 21`.
 - **`format`**: Response format (`json`, `ndjson`, `yaml`, `toml`, `xml`, `csv`, `cbor`).
 
 ---
