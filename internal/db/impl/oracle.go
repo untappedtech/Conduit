@@ -44,9 +44,9 @@ func (engine *OracleEngine) Schema(ctx context.Context, tableName string) ([]dom
 
 	pkMap, _ := engine.getPKMap(ctx, tableName)
 
-	query := `SELECT column_name, data_type, nullable, data_default, identity_column 
-		FROM user_tab_cols 
-		WHERE UPPER(table_name) = UPPER(:1) 
+	query := `SELECT column_name, data_type, nullable, data_default, identity_column
+		FROM user_tab_cols
+		WHERE UPPER(table_name) = UPPER(:1)
 		ORDER BY column_id`
 
 	rows, err := engine.sqlDatabase.QueryContext(ctx, query, tableName)
@@ -96,9 +96,9 @@ func (engine *OracleEngine) Schema(ctx context.Context, tableName string) ([]dom
 }
 
 func (engine *OracleEngine) getPKMap(ctx context.Context, tableName string) (map[string]bool, error) {
-	query := `SELECT cc.column_name 
-		FROM user_constraints c 
-		JOIN user_cons_columns cc ON c.constraint_name = cc.constraint_name 
+	query := `SELECT cc.column_name
+		FROM user_constraints c
+		JOIN user_cons_columns cc ON c.constraint_name = cc.constraint_name
 		WHERE c.constraint_type = 'P' AND UPPER(c.table_name) = UPPER(:1)`
 
 	rows, err := engine.sqlDatabase.QueryContext(ctx, query, tableName)
@@ -201,7 +201,7 @@ func (engine *OracleEngine) CreateTable(ctx context.Context, tableName string, c
 			colSQL += " UNIQUE"
 		}
 		if col.Default != nil {
-			colSQL += fmt.Sprintf(" DEFAULT %s", *col.Default)
+			colSQL += fmt.Sprintf(" DEFAULT %s", col.Default)
 		}
 
 		columnDeclarations = append(columnDeclarations, colSQL)
@@ -382,4 +382,3 @@ func (engine *OracleEngine) HealthCheck(ctx context.Context) error {
 func (engine *OracleEngine) Close() error {
 	return engine.sqlDatabase.Close()
 }
-

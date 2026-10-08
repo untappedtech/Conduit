@@ -7,10 +7,29 @@ import (
 	"github.com/untappedtech/conduit/internal/domain"
 )
 
+const (
+	maxExprLength   = 65536
+	maxTokens       = 5000
+	maxNestingDepth = 100
+)
+
 type parser struct {
 	tokens []token
 	pos    int
 	cols   []domain.ColumnDef
+	depth  int
+}
+
+func (p *parser) enter() error {
+	p.depth++
+	if p.depth > maxNestingDepth {
+		return &MalformedQueryError{Message: fmt.Sprintf("expression exceeds maximum nesting depth of %d", maxNestingDepth)}
+	}
+	return nil
+}
+
+func (p *parser) leave() {
+	p.depth--
 }
 
 func (p *parser) peek() token {
@@ -29,6 +48,11 @@ func (p *parser) next() token {
 }
 
 func (p *parser) parseOr() (WhereExpr, error) {
+	if err := p.enter(); err != nil {
+		return nil, err
+	}
+	defer p.leave()
+
 	left, err := p.parseAnd()
 	if err != nil {
 		return nil, err
@@ -47,6 +71,11 @@ func (p *parser) parseOr() (WhereExpr, error) {
 }
 
 func (p *parser) parseAnd() (WhereExpr, error) {
+	if err := p.enter(); err != nil {
+		return nil, err
+	}
+	defer p.leave()
+
 	left, err := p.parseUnary()
 	if err != nil {
 		return nil, err
@@ -65,6 +94,11 @@ func (p *parser) parseAnd() (WhereExpr, error) {
 }
 
 func (p *parser) parseUnary() (WhereExpr, error) {
+	if err := p.enter(); err != nil {
+		return nil, err
+	}
+	defer p.leave()
+
 	if p.peek().typ == tokOp && strings.ToUpper(p.peek().val) == "NOT" {
 		p.next()
 		expr, err := p.parseUnary()
@@ -78,6 +112,11 @@ func (p *parser) parseUnary() (WhereExpr, error) {
 }
 
 func (p *parser) parsePrimary() (WhereExpr, error) {
+	if err := p.enter(); err != nil {
+		return nil, err
+	}
+	defer p.leave()
+
 	tok := p.peek()
 
 	if tok.typ == tokLParen {
@@ -200,9 +239,18 @@ func (p *parser) parseInClause(column string, not bool) (WhereExpr, error) {
 
 // ParseWhere parses a WHERE expression string into an AST, validating column names against table schema.
 func ParseWhere(expr string, columns []domain.ColumnDef) (WhereExpr, error) {
+	if len(expr) > maxExprLength {
+		return nil, &MalformedQueryError{Message: fmt.Sprintf("where clause exceeds maximum length of %d bytes", maxExprLength)}
+	}
+
 	trimmed := strings.TrimSpace(expr)
 	if trimmed == "" {
 		return nil, nil
+	}
+
+	cacheKey := computeASTCacheKey(trimmed, columns)
+	if cached, ok := getCachedAST(cacheKey); ok {
+		return cached, nil
 	}
 
 	l := &lexer{input: []rune(trimmed)}
@@ -216,6 +264,9 @@ func ParseWhere(expr string, columns []domain.ColumnDef) (WhereExpr, error) {
 			break
 		}
 		tokens = append(tokens, tok)
+		if len(tokens) > maxTokens {
+			return nil, &MalformedQueryError{Message: fmt.Sprintf("where clause exceeds maximum token limit of %d", maxTokens)}
+		}
 	}
 
 	if len(tokens) == 0 {
@@ -231,5 +282,6 @@ func ParseWhere(expr string, columns []domain.ColumnDef) (WhereExpr, error) {
 		return nil, &MalformedQueryError{Message: fmt.Sprintf("unexpected extra token %q in where clause", p.tokens[p.pos].val)}
 	}
 
+	setCachedAST(cacheKey, ast)
 	return ast, nil
 }

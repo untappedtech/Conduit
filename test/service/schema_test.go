@@ -35,7 +35,7 @@ func TestTableCreationAndSchemaRetrieval(t *testing.T) {
 	if got[0].PK == nil || !*got[0].PK {
 		t.Fatalf("expected first column to be PK")
 	}
-	if got[1].Default == nil || *got[1].Default != defaultVal {
+	if got[1].Default == nil || got[1].DefaultString() != defaultVal {
 		t.Fatalf("expected default %q, got %v", defaultVal, got[1].Default)
 	}
 }

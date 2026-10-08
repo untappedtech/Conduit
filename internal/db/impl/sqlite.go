@@ -166,8 +166,8 @@ func (engine *SQLiteEngine) CreateTable(ctx context.Context, tableName string, c
 		if col.Nullable != nil && !*col.Nullable && !isAuto {
 			colSQL += " NOT NULL"
 		}
-		if col.Default != nil && *col.Default != "" {
-			colSQL += fmt.Sprintf(" DEFAULT %s", *col.Default)
+		if defStr := col.DefaultString(); defStr != "" {
+			colSQL += fmt.Sprintf(" DEFAULT %s", defStr)
 		}
 		columnDeclarations = append(columnDeclarations, colSQL)
 	}

@@ -250,9 +250,9 @@ func toOrderedRows(payload any, schema []domain.ColumnDef) ([]OrderedRow, bool, 
 				keys = append(keys, "unique")
 				vals = append(vals, *col.Unique)
 			}
-			if col.Default != nil {
+			if defVal := col.DefaultValue(); defVal != nil {
 				keys = append(keys, "default")
-				vals = append(vals, *col.Default)
+				vals = append(vals, defVal)
 			}
 			if col.PK != nil {
 				keys = append(keys, "pk")
@@ -510,13 +510,69 @@ func (e *ResponseEncoder) EncodeResponse(w http.ResponseWriter, r *http.Request,
 		if len(rows) == 0 {
 			return
 		}
-		csvWriter := csv.NewWriter(w)
-		_ = csvWriter.Write(rows[0].Keys)
+
+		allKeysMap := make(map[string]bool)
 		for _, row := range rows {
-			var strVals []string
-			for _, val := range row.Values {
-				if val == nil {
-					strVals = append(strVals, "")
+			for _, k := range row.Keys {
+				allKeysMap[k] = true
+			}
+		}
+
+		var headers []string
+		seenHeader := make(map[string]bool)
+
+		if tableName == "columns" {
+			// Canonical ordering for schema export
+			canonicalSchemaOrder := []string{"name", "type", "cid", "nullable", "unique", "default", "pk", "autoincrement"}
+			for _, colName := range canonicalSchemaOrder {
+				if allKeysMap[colName] {
+					headers = append(headers, colName)
+					seenHeader[colName] = true
+				}
+			}
+		} else if len(schema) > 0 {
+			// Sort based on schema columns if available
+			schemaCols := make([]domain.ColumnDef, len(schema))
+			copy(schemaCols, schema)
+			sort.Slice(schemaCols, func(i, j int) bool {
+				return derefInt(schemaCols[i].CID) < derefInt(schemaCols[j].CID)
+			})
+			for _, col := range schemaCols {
+				if allKeysMap[col.Name] && !seenHeader[col.Name] {
+					headers = append(headers, col.Name)
+					seenHeader[col.Name] = true
+				}
+			}
+		}
+
+		// Append any remaining keys in order of appearance
+		for _, row := range rows {
+			for _, k := range row.Keys {
+				if !seenHeader[k] {
+					seenHeader[k] = true
+					headers = append(headers, k)
+				}
+			}
+		}
+
+		csvWriter := csv.NewWriter(w)
+		_ = csvWriter.Write(headers)
+
+		for _, row := range rows {
+			rowMap := make(map[string]any, len(row.Keys))
+			for i, k := range row.Keys {
+				rowMap[k] = row.Values[i]
+			}
+
+			strVals := make([]string, 0, len(headers))
+			for _, h := range headers {
+				val, exists := rowMap[h]
+				if !exists || val == nil {
+					if tableName == "columns" && (h == "autoincrement" || h == "pk" || h == "unique") {
+						strVals = append(strVals, "false")
+					} else {
+						strVals = append(strVals, "")
+					}
 				} else {
 					strVals = append(strVals, fmt.Sprintf("%v", val))
 				}

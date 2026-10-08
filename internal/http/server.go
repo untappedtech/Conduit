@@ -17,16 +17,34 @@ type Server struct {
 	httpServer   *http.Server
 }
 
-func NewServer(apiService *service.APIService, serverConfig *domain.ServerConfig, responseEncoder *ResponseEncoder) *Server {
+func NewServer(apiService *service.APIService, serverConfig *domain.ServerConfig, responseEncoder *ResponseEncoder, customBasePath ...string) *Server {
 	apiHandler := NewAPIHandler(apiService, serverConfig, responseEncoder)
 	serveMux := http.NewServeMux()
-	apiHandler.RegisterRoutes(serveMux)
+	if len(customBasePath) > 0 && customBasePath[0] != "" {
+		apiHandler.RegisterRoutes(serveMux, customBasePath[0])
+	} else {
+		apiHandler.RegisterRoutes(serveMux)
+	}
 
 	return &Server{
 		apiHandler:   apiHandler,
 		serverConfig: serverConfig,
 		serveMux:     serveMux,
 	}
+}
+
+func (serverInstance *Server) BasePath() string {
+	return serverInstance.apiHandler.BasePath()
+}
+
+// Handler returns the underlying HTTP router.
+func (serverInstance *Server) Handler() http.Handler {
+	return serverInstance.serveMux
+}
+
+// ServeHTTP implements http.Handler for Server.
+func (serverInstance *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	serverInstance.serveMux.ServeHTTP(w, r)
 }
 
 func (serverInstance *Server) ListenAndServe(authChain []domain.AuthProvider, tokenExtractor auth.TokenExtractor, errorResponder auth.ErrorResponder) error {

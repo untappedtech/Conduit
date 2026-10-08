@@ -5,8 +5,47 @@ import (
 	"context"
 	"sync"
 
+	"github.com/untappedtech/conduit/internal/cache"
 	"github.com/untappedtech/conduit/internal/domain"
 )
+
+// CompiledQuery represents a pre-compiled parameterized SQL query and its runtime args.
+type CompiledQuery struct {
+	SQL  string
+	Args []any
+}
+
+// QueryCache is a thread-safe cache dedicated strictly to compiled SQL queries.
+type QueryCache struct {
+	cache *cache.LRUCache[string, CompiledQuery]
+}
+
+// NewQueryCache creates a new QueryCache with the specified capacity.
+func NewQueryCache(capacity int) *QueryCache {
+	return &QueryCache{
+		cache: cache.NewLRU[string, CompiledQuery](capacity),
+	}
+}
+
+// Get retrieves a compiled query from the cache.
+func (qc *QueryCache) Get(key string) (CompiledQuery, bool) {
+	return qc.cache.Get(key)
+}
+
+// Set stores a compiled query in the cache.
+func (qc *QueryCache) Set(key string, query CompiledQuery) {
+	qc.cache.Set(key, query)
+}
+
+// Invalidate clears all entries from the query cache.
+func (qc *QueryCache) Invalidate() {
+	qc.cache.Clear()
+}
+
+// Len returns the number of cached queries.
+func (qc *QueryCache) Len() int {
+	return qc.cache.Len()
+}
 
 type schemaCacheEntry struct {
 	tableName string
@@ -20,6 +59,7 @@ type CachedDatabase struct {
 	schemaMap   map[string]*list.Element
 	lruList     *list.List
 	tablesCache []string
+	queryCache  *QueryCache
 }
 
 func NewCachedDatabase(driver domain.DatabaseDriver, capacity int) domain.DatabaseDriver {
@@ -31,6 +71,7 @@ func NewCachedDatabase(driver domain.DatabaseDriver, capacity int) domain.Databa
 		capacity:       capacity,
 		schemaMap:      make(map[string]*list.Element),
 		lruList:        list.New(),
+		queryCache:     NewQueryCache(capacity),
 	}
 }
 
@@ -111,4 +152,13 @@ func (cachedDB *CachedDatabase) Invalidate() {
 	cachedDB.schemaMap = make(map[string]*list.Element)
 	cachedDB.lruList.Init()
 	cachedDB.tablesCache = nil
+	if cachedDB.queryCache != nil {
+		cachedDB.queryCache.Invalidate()
+	}
 }
+
+// QueryCache returns the query cache instance associated with this database.
+func (cachedDB *CachedDatabase) QueryCache() *QueryCache {
+	return cachedDB.queryCache
+}
+

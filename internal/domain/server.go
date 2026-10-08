@@ -84,9 +84,11 @@ type DatabaseConfig struct {
 }
 
 type ServerConfig struct {
+	// BasePath string `json:"base_path,omitempty" yaml:"base_path,omitempty" xml:"base_path,omitempty" toml:"base_path,omitempty"`
 	Server struct {
 		Host         string `json:"host" yaml:"host" xml:"host" toml:"host"`
 		Port         int    `json:"port" yaml:"port" xml:"port" toml:"port"`
+		BasePath     string `json:"base_path" yaml:"base_path" xml:"base_path" toml:"base_path"`
 		DefaultLimit int    `json:"default_limit" yaml:"default_limit" xml:"default_limit" toml:"default_limit"`
 	} `json:"server" yaml:"server" xml:"server" toml:"server"`
 	Database DatabaseConfig `json:"database" yaml:"database" xml:"database" toml:"database"`

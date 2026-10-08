@@ -34,6 +34,20 @@ func Load(customConfigPath string) (*domain.ServerConfig, error) {
 	return nil, fmt.Errorf("no config file found in fallback order (json, yaml, toml, xml)")
 }
 
+func normalizeBasePath(base string) string {
+	base = strings.TrimSpace(base)
+	if base == "" {
+		return "/v1/"
+	}
+	if !strings.HasPrefix(base, "/") {
+		base = "/" + base
+	}
+	if !strings.HasSuffix(base, "/") {
+		base = base + "/"
+	}
+	return base
+}
+
 func loadConfigFile(filePath string) (*domain.ServerConfig, error) {
 	fileData, err := os.ReadFile(filePath)
 	if err != nil {
@@ -63,6 +77,7 @@ func loadConfigFile(filePath string) (*domain.ServerConfig, error) {
 	if serverConfig.Server.DefaultLimit < 0 {
 		serverConfig.Server.DefaultLimit = 50
 	}
+	serverConfig.Server.BasePath = normalizeBasePath(serverConfig.Server.BasePath)
 
 	return serverConfig, nil
 }
@@ -71,6 +86,7 @@ func GenerateDefaultConfig(formatType string, outputFilePath string) error {
 	defaultConfig := &domain.ServerConfig{}
 	defaultConfig.Server.Host = "0.0.0.0"
 	defaultConfig.Server.Port = 8080
+	defaultConfig.Server.BasePath = "/v1/"
 	defaultConfig.Server.DefaultLimit = 50
 
 	defaultConfig.Database.Driver = "sqlite"

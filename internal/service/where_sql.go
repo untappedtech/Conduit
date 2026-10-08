@@ -110,7 +110,18 @@ func (in *InExpr) ToSQL(dialect SQLDialect, startParamIndex int) (string, []any)
 
 // ParseWhereSQL parses a WHERE clause and produces safe SQL and parameter arguments for the given dialect.
 func ParseWhereSQL(expr string, columns []domain.ColumnDef, dialect SQLDialect, startParamIndex int) (string, []any, error) {
-	ast, err := ParseWhere(expr, columns)
+	trimmed := strings.TrimSpace(expr)
+	if trimmed == "" {
+		return "", nil, nil
+	}
+
+	dialect = ensureDialect(dialect)
+	cacheKey := computeSQLCacheKey(trimmed, columns, dialect, startParamIndex)
+	if sql, args, ok := getCachedSQL(cacheKey); ok {
+		return sql, args, nil
+	}
+
+	ast, err := ParseWhere(trimmed, columns)
 	if err != nil {
 		return "", nil, err
 	}
@@ -118,5 +129,6 @@ func ParseWhereSQL(expr string, columns []domain.ColumnDef, dialect SQLDialect, 
 		return "", nil, nil
 	}
 	sql, args := ast.ToSQL(dialect, startParamIndex)
+	setCachedSQL(cacheKey, sql, args)
 	return sql, args, nil
 }

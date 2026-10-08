@@ -15,26 +15,57 @@ type APIHandler struct {
 	apiService      *service.APIService
 	serverConfig    *domain.ServerConfig
 	responseEncoder *ResponseEncoder
+	basePath        string
+}
+
+func normalizeBasePath(base string) string {
+	base = strings.TrimSpace(base)
+	if base == "" {
+		return "/v1/"
+	}
+	if !strings.HasPrefix(base, "/") {
+		base = "/" + base
+	}
+	if !strings.HasSuffix(base, "/") {
+		base = base + "/"
+	}
+	return base
 }
 
 func NewAPIHandler(apiService *service.APIService, serverConfig *domain.ServerConfig, responseEncoder *ResponseEncoder) *APIHandler {
+	basePath := "/v1/"
+	if serverConfig != nil && serverConfig.Server.BasePath != "" {
+		basePath = serverConfig.Server.BasePath
+	}
 	return &APIHandler{
 		apiService:      apiService,
 		serverConfig:    serverConfig,
 		responseEncoder: responseEncoder,
+		basePath:        normalizeBasePath(basePath),
 	}
 }
 
-func (handler *APIHandler) RegisterRoutes(serveMux *http.ServeMux) {
-	serveMux.HandleFunc("/v1/schema", handler.handleSchema)
-	serveMux.HandleFunc("/v1/schema/", handler.handleSchema)
-	serveMux.HandleFunc("/v1/", handler.handleCRUD)
+func (handler *APIHandler) BasePath() string {
+	return handler.basePath
+}
+
+func (handler *APIHandler) RegisterRoutes(serveMux *http.ServeMux, customBasePath ...string) {
+	if len(customBasePath) > 0 && customBasePath[0] != "" {
+		handler.basePath = normalizeBasePath(customBasePath[0])
+	}
+	base := handler.basePath
+	schemaPath := strings.TrimRight(base, "/") + "/schema"
+
+	serveMux.HandleFunc(schemaPath, handler.handleSchema)
+	serveMux.HandleFunc(schemaPath+"/", handler.handleSchema)
+	serveMux.HandleFunc(base, handler.handleCRUD)
 }
 
 func (handler *APIHandler) handleSchema(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[HTTP] %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
 
-	requestPath := strings.TrimPrefix(r.URL.Path, "/v1/schema")
+	schemaPath := strings.TrimRight(handler.basePath, "/") + "/schema"
+	requestPath := strings.TrimPrefix(r.URL.Path, schemaPath)
 	tableName := strings.Trim(requestPath, "/")
 
 	// GET /v1/schema → list tables
@@ -102,7 +133,7 @@ func (handler *APIHandler) handleSchema(w http.ResponseWriter, r *http.Request) 
 func (handler *APIHandler) handleCRUD(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[HTTP] %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
 
-	requestPath := strings.TrimPrefix(r.URL.Path, "/v1/")
+	requestPath := strings.TrimPrefix(r.URL.Path, handler.basePath)
 	pathParts := strings.Split(strings.Trim(requestPath, "/"), "/")
 
 	if len(pathParts) == 0 || pathParts[0] == "" {

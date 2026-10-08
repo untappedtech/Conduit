@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/xml"
 	"errors"
+	"fmt"
+	"reflect"
 )
 
 var (
@@ -11,14 +13,36 @@ var (
 )
 
 type ColumnDef struct {
-	Name          string  `json:"name" yaml:"name" xml:"name" toml:"name"`
-	Type          string  `json:"type" yaml:"type" xml:"type" toml:"type"`
-	Nullable      *bool   `json:"nullable,omitempty" yaml:"nullable,omitempty" xml:"nullable,omitempty" toml:"nullable,omitempty"`
-	Unique        *bool   `json:"unique,omitempty" yaml:"unique,omitempty" xml:"unique,omitempty" toml:"unique,omitempty"`
-	Default       *string `json:"default,omitempty" yaml:"default,omitempty" xml:"default,omitempty" toml:"default,omitempty"`
-	PK            *bool   `json:"pk,omitempty" yaml:"pk,omitempty" xml:"pk,omitempty" toml:"pk,omitempty"`
-	Autoincrement *bool   `json:"autoincrement,omitempty" yaml:"autoincrement,omitempty" xml:"autoincrement,omitempty" toml:"autoincrement,omitempty"`
-	CID           *int    `json:"cid,omitempty" yaml:"cid,omitempty" xml:"cid,omitempty" toml:"cid,omitempty"`
+	Name          string `json:"name" yaml:"name" xml:"name" toml:"name"`
+	Type          string `json:"type" yaml:"type" xml:"type" toml:"type"`
+	Nullable      *bool  `json:"nullable,omitempty" yaml:"nullable,omitempty" xml:"nullable,omitempty" toml:"nullable,omitempty"`
+	Unique        *bool  `json:"unique,omitempty" yaml:"unique,omitempty" xml:"unique,omitempty" toml:"unique,omitempty"`
+	Default       any    `json:"default,omitempty" yaml:"default,omitempty" xml:"default,omitempty" toml:"default,omitempty"`
+	PK            *bool  `json:"pk,omitempty" yaml:"pk,omitempty" xml:"pk,omitempty" toml:"pk,omitempty"`
+	Autoincrement *bool  `json:"autoincrement,omitempty" yaml:"autoincrement,omitempty" xml:"autoincrement,omitempty" toml:"autoincrement,omitempty"`
+	CID           *int   `json:"cid,omitempty" yaml:"cid,omitempty" xml:"cid,omitempty" toml:"cid,omitempty"`
+}
+
+func (c ColumnDef) DefaultValue() any {
+	if c.Default == nil {
+		return nil
+	}
+	v := reflect.ValueOf(c.Default)
+	if v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return nil
+		}
+		return v.Elem().Interface()
+	}
+	return c.Default
+}
+
+func (c ColumnDef) DefaultString() string {
+	val := c.DefaultValue()
+	if val == nil {
+		return ""
+	}
+	return fmt.Sprint(val)
 }
 
 type XMLSchema struct {

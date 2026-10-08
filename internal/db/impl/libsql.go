@@ -168,8 +168,8 @@ func (engine *LibSQLEngine) CreateTable(ctx context.Context, tableName string, c
 		if col.Unique != nil && *col.Unique && !isPK {
 			colSQL += " UNIQUE"
 		}
-		if col.Default != nil {
-			colSQL += fmt.Sprintf(" DEFAULT %s", *col.Default)
+		if defStr := col.DefaultString(); defStr != "" {
+			colSQL += fmt.Sprintf(" DEFAULT %s", defStr)
 		}
 
 		columnDeclarations = append(columnDeclarations, colSQL)
@@ -351,4 +351,3 @@ func (engine *LibSQLEngine) HealthCheck(ctx context.Context) error {
 func (engine *LibSQLEngine) Close() error {
 	return engine.sqlDatabase.Close()
 }
-
