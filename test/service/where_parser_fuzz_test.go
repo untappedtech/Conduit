@@ -1,9 +1,10 @@
-package service
+package service_test
 
 import (
 	"testing"
 
 	"github.com/untappedtech/conduit/internal/domain"
+	"github.com/untappedtech/conduit/internal/service"
 )
 
 func FuzzWhereParser(f *testing.F) {
@@ -89,18 +90,18 @@ func FuzzWhereParser(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, expr string) {
 		// Neither ParseWhere nor subsequent AST evaluation/SQL conversion should panic
-		ast, err := ParseWhere(expr, cols)
+		ast, err := service.ParseWhere(expr, cols)
 		if err != nil || ast == nil {
 			return
 		}
 
 		// Ensure ToSQL does not panic
-		sql, args := ast.ToSQL(ansiDialect{}, 1)
+		sql, args := ast.ToSQL(service.SimpleDialect{}, 1)
 		_ = sql
 		_ = args
 
 		// Ensure ParseWhereSQL does not panic
-		sql2, args2, err2 := ParseWhereSQL(expr, cols, ansiDialect{}, 1)
+		sql2, args2, err2 := service.ParseWhereSQL(expr, cols, service.SimpleDialect{}, 1)
 		_ = sql2
 		_ = args2
 		_ = err2

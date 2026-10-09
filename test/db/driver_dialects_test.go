@@ -1,4 +1,4 @@
-package service_test
+package db_test
 
 import (
 	"testing"
@@ -19,12 +19,12 @@ func TestDriverDialects_QuoteAndPlaceholder(t *testing.T) {
 	oracle := &impl.OracleEngine{}
 
 	tests := []struct {
-		name            string
-		dialect         service.SQLDialect
-		colName         string
-		expectedQuote   string
-		paramIndex      int
-		expectedPlace   string
+		name          string
+		dialect       service.SQLDialect
+		colName       string
+		expectedQuote string
+		paramIndex    int
+		expectedPlace string
 	}{
 		{"SQLite", sqlite, "user_name", `"user_name"`, 1, "?"},
 		{"SQLite Escaped", sqlite, `user"name`, `"user""name"`, 2, "?"},

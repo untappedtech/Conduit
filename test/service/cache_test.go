@@ -1,16 +1,17 @@
-package service
+package service_test
 
 import (
 	"fmt"
 	"testing"
 
 	"github.com/untappedtech/conduit/internal/domain"
+	"github.com/untappedtech/conduit/internal/service"
 )
 
 func TestWhereCache_ASTAndSQL(t *testing.T) {
-	ClearWhereCache()
-	SetCachingEnabled(true)
-	defer ClearWhereCache()
+	service.ClearWhereCache()
+	service.SetCachingEnabled(true)
+	defer service.ClearWhereCache()
 
 	cols := []domain.ColumnDef{
 		{Name: "id", Type: "INTEGER"},
@@ -21,13 +22,13 @@ func TestWhereCache_ASTAndSQL(t *testing.T) {
 	whereQuery := "age > 21 AND name = 'Alice'"
 
 	// First call - cache miss
-	ast1, err := ParseWhere(whereQuery, cols)
+	ast1, err := service.ParseWhere(whereQuery, cols)
 	if err != nil {
 		t.Fatalf("unexpected error on ParseWhere: %v", err)
 	}
 
 	// Second call - should hit AST cache and return the same pointer
-	ast2, err := ParseWhere(whereQuery, cols)
+	ast2, err := service.ParseWhere(whereQuery, cols)
 	if err != nil {
 		t.Fatalf("unexpected error on second ParseWhere: %v", err)
 	}
@@ -36,12 +37,12 @@ func TestWhereCache_ASTAndSQL(t *testing.T) {
 	}
 
 	// Test ParseWhereSQL caching
-	sql1, args1, err := ParseWhereSQL(whereQuery, cols, ansiDialect{}, 1)
+	sql1, args1, err := service.ParseWhereSQL(whereQuery, cols, service.SimpleDialect{}, 1)
 	if err != nil {
 		t.Fatalf("unexpected error on ParseWhereSQL: %v", err)
 	}
 
-	sql2, args2, err := ParseWhereSQL(whereQuery, cols, ansiDialect{}, 1)
+	sql2, args2, err := service.ParseWhereSQL(whereQuery, cols, service.SimpleDialect{}, 1)
 	if err != nil {
 		t.Fatalf("unexpected error on second ParseWhereSQL: %v", err)
 	}
@@ -60,26 +61,26 @@ func TestWhereCache_ASTAndSQL(t *testing.T) {
 
 	// Verify mutating returned args does not corrupt cache
 	args1[0] = 99999
-	_, freshArgs, _ := ParseWhereSQL(whereQuery, cols, ansiDialect{}, 1)
+	_, freshArgs, _ := service.ParseWhereSQL(whereQuery, cols, service.SimpleDialect{}, 1)
 	if freshArgs[0] == 99999 {
 		t.Fatalf("cache was mutated by caller!")
 	}
 }
 
 func TestWhereCache_DisableAndClear(t *testing.T) {
-	ClearWhereCache()
-	defer ClearWhereCache()
+	service.ClearWhereCache()
+	defer service.ClearWhereCache()
 
 	cols := []domain.ColumnDef{
 		{Name: "id", Type: "INTEGER"},
 	}
 
-	SetCachingEnabled(false)
-	ast1, err := ParseWhere("id = 1", cols)
+	service.SetCachingEnabled(false)
+	ast1, err := service.ParseWhere("id = 1", cols)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
-	ast2, err := ParseWhere("id = 1", cols)
+	ast2, err := service.ParseWhere("id = 1", cols)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
@@ -87,15 +88,15 @@ func TestWhereCache_DisableAndClear(t *testing.T) {
 		t.Fatalf("expected different pointers when caching disabled")
 	}
 
-	SetCachingEnabled(true)
-	ast3, _ := ParseWhere("id = 1", cols)
-	ast4, _ := ParseWhere("id = 1", cols)
+	service.SetCachingEnabled(true)
+	ast3, _ := service.ParseWhere("id = 1", cols)
+	ast4, _ := service.ParseWhere("id = 1", cols)
 	if ast3 != ast4 {
 		t.Fatalf("expected identical pointers when caching enabled")
 	}
 
-	ClearWhereCache()
-	ast5, _ := ParseWhere("id = 1", cols)
+	service.ClearWhereCache()
+	ast5, _ := service.ParseWhere("id = 1", cols)
 	if ast4 == ast5 {
 		t.Fatalf("expected new pointer after ClearWhereCache")
 	}
