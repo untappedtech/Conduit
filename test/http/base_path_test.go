@@ -177,5 +177,8 @@ database:
 		if !strings.Contains(string(data), "/v1/") {
 			t.Fatalf("expected generated %s config to contain '/v1/', got:\n%s", fmtType, string(data))
 		}
+		if !strings.Contains(string(data), "Conduit API") {
+			t.Fatalf("expected generated %s config to contain 'Conduit API', got:\n%s", fmtType, string(data))
+		}
 	}
 }

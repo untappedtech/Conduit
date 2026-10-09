@@ -38,7 +38,7 @@ func (e *ResponseEncoder) NegotiateOutputFormat(r *http.Request, input domain.Fo
 		switch formatParam {
 		case "json":
 			return domain.FormatJSON
-		case "ndjson":
+		case "ndjson", "jsonl":
 			return domain.FormatNDJSON
 		case "yaml", "yml":
 			return domain.FormatYAML

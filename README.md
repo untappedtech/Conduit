@@ -2,41 +2,41 @@
 
 ### Multi‑Format, Database‑Agnostic REST Engine
 
-Conduit is a **zero‑boilerplate REST engine** that instantly exposes your database as a fully‑typed, multi‑format HTTP API.  
+Conduit is a **zero‑boilerplate REST engine** that instantly exposes your database as a fully‑typed, multi‑format HTTP API.
 It supports **JSON, XML, YAML, TOML, NDJSON, CSV, and CBOR** — simultaneously — and works with **any SQL database** through a pluggable driver system.
 
-Conduit eliminates the need to hand‑craft REST interfaces, controllers, serializers, or schema definitions.  
+Conduit eliminates the need to hand‑craft REST interfaces, controllers, serializers, or schema definitions.
 Point it at a database, start the server, and your tables become live REST endpoints.
 
 ---
 
 ## ✨ Key Features
 
-- **Multi‑format input & output**  
+- **Multi‑format input & output**
   JSON, XML, YAML, TOML, NDJSON, CSV, CBOR — all first‑class citizens.
 
-- **Database‑agnostic**  
+- **Database‑agnostic**
   Official drivers for SQLite, PostgreSQL, MySQL/MariaDB, SQL Server, libSQL/Turso, ClickHouse, and Oracle.
 
-- **Zero‑code REST API generation**  
+- **Zero‑code REST API generation**
   Every table becomes an endpoint automatically.
 
-- **Schema creation via API**  
+- **Schema creation via API**
   Create new tables with `POST /v1/schema/<table>`.
 
-- **Pluggable backend architecture**  
+- **Pluggable backend architecture**
   Swap databases or authorization modules without changing your API.
 
-- **Strong typing with graceful fallback**  
+- **Strong typing with graceful fallback**
   SQL types are preserved when possible; incompatible types (e.g., datetime) are safely represented as strings.
 
-- **Config‑driven behavior**  
+- **Config‑driven behavior**
   Conduit auto‑detects config files in JSON, YAML, TOML, or XML.
 
-- **Simple deployment**  
+- **Simple deployment**
   Single static binary or `go install`.
 
-- **MIT‑licensed open core**  
+- **MIT‑licensed open core**
   Free to use, extend, and integrate.
 
 ---
@@ -322,14 +322,14 @@ Premium features (event bus, advanced output types, etc.) will be introduced lat
 
 ## 📜 License
 
-**MIT License**  
+**MIT License**
 Open core model — free for commercial and private use.
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome.  
+Contributions are welcome.
 Driver implementations, format handlers, and performance improvements are especially appreciated.
 
 ---

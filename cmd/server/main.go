@@ -16,6 +16,7 @@ import (
 	"github.com/untappedtech/conduit/internal/config"
 	"github.com/untappedtech/conduit/internal/db"
 	httpPkg "github.com/untappedtech/conduit/internal/http"
+	"github.com/untappedtech/conduit/internal/openapi"
 	"github.com/untappedtech/conduit/internal/service"
 )
 
@@ -25,6 +26,9 @@ func main() {
 
 	generateConfigFormat := flag.String("generate-config", "", "Generate default config file of specified type (json|yaml|toml|xml) and exit")
 	flag.StringVar(generateConfigFormat, "g", "", "Short for --generate-config")
+
+	exportOpenAPIPath := flag.String("export-openapi", "", "Export OpenAPI specification to specified file path and exit")
+	flag.StringVar(exportOpenAPIPath, "e", "", "Short for --export-openapi")
 	flag.Parse()
 
 	if *generateConfigFormat != "" {
@@ -60,13 +64,28 @@ func main() {
 	}
 
 	apiService := service.NewAPIService(operationalDB, serverConfig)
+
+	if *exportOpenAPIPath != "" {
+		generator := openapi.NewGenerator(apiService, serverConfig)
+		specJSON, err := generator.GenerateJSON(context.Background())
+		if err != nil {
+			log.Fatalf("failed to generate OpenAPI specification: %v", err)
+		}
+		if err := os.WriteFile(*exportOpenAPIPath, specJSON, 0644); err != nil {
+			log.Fatalf("failed to write OpenAPI specification to %s: %v", *exportOpenAPIPath, err)
+		}
+		log.Printf("Successfully exported OpenAPI specification to: %s", *exportOpenAPIPath)
+		_ = operationalDB.Close()
+		os.Exit(0)
+	}
+
 	serverInstance := httpPkg.NewServer(apiService, serverConfig, responseEncoder)
 
 	signalChannel := make(chan os.Signal, 1)
 	signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 
 	go func() {
-		log.Printf("Server listening on %s:%d (Driver: %s, Auth Chain Depth: %d)", 
+		log.Printf("Server listening on %s:%d (Driver: %s, Auth Chain Depth: %d)",
 			serverConfig.Server.Host, serverConfig.Server.Port, serverConfig.Database.Driver, len(authChain))
 		if listenError := serverInstance.ListenAndServe(authChain, tokenExtractor, responseEncoder); listenError != nil && !errors.Is(listenError, http.ErrServerClosed) {
 			log.Fatalf("Server listener failure: %v", listenError)

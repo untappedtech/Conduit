@@ -10,13 +10,13 @@
   </defs>
 
   <g fill="none"
-     stroke="url(#conduitGrad)"
-     stroke-width="10"
-     stroke-linecap="round"
-     stroke-linejoin="round">
+    stroke="url(#conduitGrad)"
+    stroke-width="10"
+    stroke-linecap="round"
+    stroke-linejoin="round">
 
     <!-- Center node -->
-    <circle cx="256" cy="128" r="37" />
+    <circle cx="256" cy="128" r="35" stroke-width="16" />
 
     <!-- === LEFT SIDE === -->
 

@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -8,14 +9,16 @@ import (
 
 	"github.com/untappedtech/conduit/internal/domain"
 	"github.com/untappedtech/conduit/internal/errors"
+	"github.com/untappedtech/conduit/internal/openapi"
 	"github.com/untappedtech/conduit/internal/service"
 )
 
 type APIHandler struct {
-	apiService      *service.APIService
-	serverConfig    *domain.ServerConfig
-	responseEncoder *ResponseEncoder
-	basePath        string
+	apiService       *service.APIService
+	serverConfig     *domain.ServerConfig
+	responseEncoder  *ResponseEncoder
+	basePath         string
+	openAPIGenerator *openapi.Generator
 }
 
 func normalizeBasePath(base string) string {
@@ -38,15 +41,20 @@ func NewAPIHandler(apiService *service.APIService, serverConfig *domain.ServerCo
 		basePath = serverConfig.Server.BasePath
 	}
 	return &APIHandler{
-		apiService:      apiService,
-		serverConfig:    serverConfig,
-		responseEncoder: responseEncoder,
-		basePath:        normalizeBasePath(basePath),
+		apiService:       apiService,
+		serverConfig:     serverConfig,
+		responseEncoder:  responseEncoder,
+		basePath:         normalizeBasePath(basePath),
+		openAPIGenerator: openapi.NewGenerator(apiService, serverConfig),
 	}
 }
 
 func (handler *APIHandler) BasePath() string {
 	return handler.basePath
+}
+
+func (handler *APIHandler) OpenAPIGenerator() *openapi.Generator {
+	return handler.openAPIGenerator
 }
 
 func (handler *APIHandler) RegisterRoutes(serveMux *http.ServeMux, customBasePath ...string) {
@@ -58,6 +66,20 @@ func (handler *APIHandler) RegisterRoutes(serveMux *http.ServeMux, customBasePat
 
 	serveMux.HandleFunc(schemaPath, handler.handleSchema)
 	serveMux.HandleFunc(schemaPath+"/", handler.handleSchema)
+
+	openAPIPath := strings.TrimRight(base, "/") + "/openapi.json"
+	docsPath := strings.TrimRight(base, "/") + "/docs"
+
+	serveMux.HandleFunc(openAPIPath, handler.handleOpenAPI)
+	serveMux.HandleFunc(docsPath, handler.handleDocsUI)
+	serveMux.HandleFunc(docsPath+"/", handler.handleDocsUI)
+
+	if base != "/" {
+		serveMux.HandleFunc("/openapi.json", handler.handleOpenAPI)
+		serveMux.HandleFunc("/docs", handler.handleDocsUI)
+		serveMux.HandleFunc("/docs/", handler.handleDocsUI)
+	}
+
 	serveMux.HandleFunc(base, handler.handleCRUD)
 }
 
@@ -112,6 +134,7 @@ func (handler *APIHandler) handleSchema(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
+		handler.openAPIGenerator.Invalidate()
 		log.Printf("[INFO] Table successfully created: %s", tableName)
 		columns, _ := handler.apiService.GetSchema(r.Context(), tableName)
 		handler.responseEncoder.EncodeResponse(w, r, http.StatusCreated, columns, format, "columns", nil)
@@ -122,6 +145,7 @@ func (handler *APIHandler) handleSchema(w http.ResponseWriter, r *http.Request) 
 			handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError.With(err, "Table: "+tableName))
 			return
 		}
+		handler.openAPIGenerator.Invalidate()
 		log.Printf("[INFO] Table successfully dropped: %s", tableName)
 		w.WriteHeader(http.StatusNoContent)
 
@@ -138,6 +162,16 @@ func (handler *APIHandler) handleCRUD(w http.ResponseWriter, r *http.Request) {
 
 	if len(pathParts) == 0 || pathParts[0] == "" {
 		handler.responseEncoder.EncodeError(w, r, errors.ErrNotFound)
+		return
+	}
+
+	if pathParts[0] == "openapi.json" {
+		handler.handleOpenAPI(w, r)
+		return
+	}
+
+	if pathParts[0] == "docs" {
+		handler.handleDocsUI(w, r)
 		return
 	}
 
@@ -248,4 +282,50 @@ func (handler *APIHandler) handleCRUD(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler.responseEncoder.EncodeError(w, r, errors.ErrNotFound)
+}
+
+func (handler *APIHandler) handleOpenAPI(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[HTTP] %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		handler.responseEncoder.EncodeError(w, r, errors.ErrMethodNotAllowed)
+		return
+	}
+
+	data, err := handler.openAPIGenerator.GenerateJSON(r.Context())
+	if err != nil {
+		log.Printf("[ERROR] Failed to generate OpenAPI spec: %v", err)
+		handler.responseEncoder.EncodeError(w, r, errors.ErrInternalServerError.With(err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.WriteHeader(http.StatusOK)
+	if r.Method == http.MethodHead {
+		return
+	}
+	_, _ = w.Write(data)
+}
+
+func (handler *APIHandler) handleDocsUI(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[HTTP] %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		handler.responseEncoder.EncodeError(w, r, errors.ErrMethodNotAllowed)
+		return
+	}
+
+	specURL := strings.TrimRight(handler.basePath, "/") + "/openapi.json"
+	docTitle := "Conduit API Reference"
+	if handler.serverConfig != nil && handler.serverConfig.OpenAPI.Title != "" {
+		docTitle = fmt.Sprintf("%s Reference", handler.serverConfig.OpenAPI.Title)
+	}
+	html := openapi.DocsHTML(specURL, docTitle)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	if r.Method == http.MethodHead {
+		return
+	}
+	_, _ = w.Write(html)
 }

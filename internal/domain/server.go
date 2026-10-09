@@ -83,6 +83,32 @@ type DatabaseConfig struct {
 	DSN    string `json:"dsn" yaml:"dsn" xml:"dsn" toml:"dsn"`
 }
 
+type OpenAPIContactConfig struct {
+	Name  string `json:"name,omitempty" yaml:"name,omitempty" xml:"name,omitempty" toml:"name,omitempty"`
+	Email string `json:"email,omitempty" yaml:"email,omitempty" xml:"email,omitempty" toml:"email,omitempty"`
+	URL   string `json:"url,omitempty" yaml:"url,omitempty" xml:"url,omitempty" toml:"url,omitempty"`
+}
+
+type OpenAPILicenseConfig struct {
+	Name string `json:"name,omitempty" yaml:"name,omitempty" xml:"name,omitempty" toml:"name,omitempty"`
+	URL  string `json:"url,omitempty" yaml:"url,omitempty" xml:"url,omitempty" toml:"url,omitempty"`
+}
+
+type OpenAPIServerConfig struct {
+	URL         string `json:"url" yaml:"url" xml:"url" toml:"url"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty" xml:"description,omitempty" toml:"description,omitempty"`
+}
+
+type OpenAPIConfig struct {
+	Title          string                `json:"title,omitempty" yaml:"title,omitempty" xml:"title,omitempty" toml:"title,omitempty"`
+	Version        string                `json:"version,omitempty" yaml:"version,omitempty" xml:"version,omitempty" toml:"version,omitempty"`
+	Description    string                `json:"description,omitempty" yaml:"description,omitempty" xml:"description,omitempty" toml:"description,omitempty"`
+	TermsOfService string                `json:"terms_of_service,omitempty" yaml:"terms_of_service,omitempty" xml:"terms_of_service,omitempty" toml:"terms_of_service,omitempty"`
+	Contact        *OpenAPIContactConfig `json:"contact,omitempty" yaml:"contact,omitempty" xml:"contact,omitempty" toml:"contact,omitempty"`
+	License        *OpenAPILicenseConfig `json:"license,omitempty" yaml:"license,omitempty" xml:"license,omitempty" toml:"license,omitempty"`
+	Servers        []OpenAPIServerConfig `json:"servers,omitempty" yaml:"servers,omitempty" xml:"servers,omitempty" toml:"servers,omitempty"`
+}
+
 type ServerConfig struct {
 	// BasePath string `json:"base_path,omitempty" yaml:"base_path,omitempty" xml:"base_path,omitempty" toml:"base_path,omitempty"`
 	Server struct {
@@ -94,4 +120,5 @@ type ServerConfig struct {
 	Database DatabaseConfig `json:"database" yaml:"database" xml:"database" toml:"database"`
 	Policy   PolicyConfig   `json:"policy" yaml:"policy" xml:"policy" toml:"policy"`
 	Auth     AuthConfig     `json:"auth" yaml:"auth" xml:"auth" toml:"auth"`
+	OpenAPI  OpenAPIConfig  `json:"openapi,omitempty" yaml:"openapi,omitempty" xml:"openapi,omitempty" toml:"openapi,omitempty"`
 }

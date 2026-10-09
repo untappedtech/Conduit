@@ -330,3 +330,63 @@ func TestHTTP_CBORFormatAndOrdering(t *testing.T) {
 		t.Fatalf("expected name=Golf, got %#v", name)
 	}
 }
+
+func TestHTTP_XML_CRUD(t *testing.T) {
+	srv := setupTestHTTPServer()
+	createSportsSchema(t, srv)
+
+	// 1. POST record in XML
+	postReq := httptest.NewRequest(http.MethodPost, "/v1/sports", strings.NewReader("<item><name>Tennis</name><players>2</players></item>"))
+	postReq.Header.Set("Content-Type", "application/xml")
+	postRec := httptest.NewRecorder()
+	srv.ServeHTTP(postRec, postReq)
+	if postRec.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created, got %d: %s", postRec.Code, postRec.Body.String())
+	}
+	if !strings.Contains(postRec.Body.String(), "<name>Tennis</name>") {
+		t.Fatalf("expected response to contain <name>Tennis</name>, got: %s", postRec.Body.String())
+	}
+
+	// 2. GET single record in XML
+	getReq := httptest.NewRequest(http.MethodGet, "/v1/sports/1?format=xml", nil)
+	getRec := httptest.NewRecorder()
+	srv.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d: %s", getRec.Code, getRec.Body.String())
+	}
+	if !strings.Contains(getRec.Body.String(), "<sports>") || !strings.Contains(getRec.Body.String(), "<name>Tennis</name>") {
+		t.Fatalf("expected sports XML with Tennis, got: %s", getRec.Body.String())
+	}
+
+	// 3. PUT update record in XML
+	putReq := httptest.NewRequest(http.MethodPut, "/v1/sports/1", strings.NewReader("<item><name>Tennis Pro</name><players>4</players></item>"))
+	putReq.Header.Set("Content-Type", "application/xml")
+	putRec := httptest.NewRecorder()
+	srv.ServeHTTP(putRec, putReq)
+	if putRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d: %s", putRec.Code, putRec.Body.String())
+	}
+	if !strings.Contains(putRec.Body.String(), "<name>Tennis Pro</name>") {
+		t.Fatalf("expected response to contain <name>Tennis Pro</name>, got: %s", putRec.Body.String())
+	}
+
+	// 4. PATCH record in XML
+	patchReq := httptest.NewRequest(http.MethodPatch, "/v1/sports/1", strings.NewReader("<item><players>8</players></item>"))
+	patchReq.Header.Set("Content-Type", "application/xml")
+	patchRec := httptest.NewRecorder()
+	srv.ServeHTTP(patchRec, patchReq)
+	if patchRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d: %s", patchRec.Code, patchRec.Body.String())
+	}
+	if !strings.Contains(patchRec.Body.String(), "<players>8</players>") {
+		t.Fatalf("expected response to contain <players>8</players>, got: %s", patchRec.Body.String())
+	}
+
+	// 5. DELETE record
+	delReq := httptest.NewRequest(http.MethodDelete, "/v1/sports/1", nil)
+	delRec := httptest.NewRecorder()
+	srv.ServeHTTP(delRec, delReq)
+	if delRec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 No Content, got %d: %s", delRec.Code, delRec.Body.String())
+	}
+}

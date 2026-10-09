@@ -36,7 +36,7 @@ func DecodeInputPayload[T any](request *http.Request, targetObject *T) (domain.F
 		decodeError = toml.NewDecoder(request.Body).Decode(targetObject)
 	case strings.Contains(contentTypeHeader, "xml"):
 		parsedFormat = domain.FormatXML
-		decodeError = xml.NewDecoder(request.Body).Decode(targetObject)
+		decodeError = decodeXMLPayload(request.Body, targetObject)
 	case strings.Contains(contentTypeHeader, "cbor"):
 		parsedFormat = domain.FormatCBOR
 		dec := cbor.NewDecoder(request.Body)
@@ -205,4 +205,180 @@ func coerceCSVCell(cell string) any {
 		return floatValue
 	}
 	return trimmed
+}
+
+type xmlNode struct {
+	XMLName  xml.Name
+	Attrs    []xml.Attr
+	Content  string
+	Children []xmlNode
+}
+
+func parseXMLNode(dec *xml.Decoder, start xml.StartElement) (xmlNode, error) {
+	node := xmlNode{
+		XMLName: start.Name,
+		Attrs:   start.Attr,
+	}
+	var content strings.Builder
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			if err == io.EOF {
+				node.Content = strings.TrimSpace(content.String())
+				return node, nil
+			}
+			return node, err
+		}
+		switch t := tok.(type) {
+		case xml.StartElement:
+			child, err := parseXMLNode(dec, t)
+			if err != nil {
+				return node, err
+			}
+			node.Children = append(node.Children, child)
+		case xml.EndElement:
+			if t.Name.Local == start.Name.Local {
+				node.Content = strings.TrimSpace(content.String())
+				return node, nil
+			}
+		case xml.CharData:
+			content.Write(t)
+		}
+	}
+}
+
+func nodeToMap(node xmlNode) map[string]any {
+	// If root has exactly one child, that child itself has children, and root has no attributes,
+	// unwrap it (e.g. <records><record>...</record></records> or <test_xml><row>...</row></test_xml>).
+	if len(node.Children) == 1 && len(node.Children[0].Children) > 0 && len(node.Attrs) == 0 {
+		return nodeToMap(node.Children[0])
+	}
+
+	result := make(map[string]any)
+	for _, attr := range node.Attrs {
+		if attr.Name.Space == "xmlns" || attr.Name.Local == "xmlns" {
+			continue
+		}
+		result[attr.Name.Local] = coerceCSVCell(attr.Value)
+	}
+
+	for _, child := range node.Children {
+		key := child.XMLName.Local
+		var val any
+		if len(child.Children) > 0 {
+			val = nodeToMap(child)
+		} else {
+			val = coerceCSVCell(child.Content)
+		}
+
+		if existing, exists := result[key]; exists {
+			if slice, ok := existing.([]any); ok {
+				result[key] = append(slice, val)
+			} else {
+				result[key] = []any{existing, val}
+			}
+		} else {
+			result[key] = val
+		}
+	}
+
+	return result
+}
+
+func xmlToMap(body io.Reader) (map[string]any, error) {
+	dec := xml.NewDecoder(body)
+	var rootStart *xml.StartElement
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return nil, err
+		}
+		if se, ok := tok.(xml.StartElement); ok {
+			rootStart = &se
+			break
+		}
+	}
+	if rootStart == nil {
+		return nil, io.EOF
+	}
+
+	rootNode, err := parseXMLNode(dec, *rootStart)
+	if err != nil {
+		return nil, err
+	}
+
+	return nodeToMap(rootNode), nil
+}
+
+func xmlToMapSlice(body io.Reader) ([]map[string]any, error) {
+	dec := xml.NewDecoder(body)
+	var rootStart *xml.StartElement
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return nil, err
+		}
+		if se, ok := tok.(xml.StartElement); ok {
+			rootStart = &se
+			break
+		}
+	}
+	if rootStart == nil {
+		return nil, io.EOF
+	}
+
+	rootNode, err := parseXMLNode(dec, *rootStart)
+	if err != nil {
+		return nil, err
+	}
+
+	var records []map[string]any
+	for _, child := range rootNode.Children {
+		records = append(records, nodeToMap(child))
+	}
+	if len(records) == 0 {
+		records = append(records, nodeToMap(rootNode))
+	}
+	return records, nil
+}
+
+func decodeXMLPayload[T any](body io.Reader, targetObject *T) error {
+	switch dest := any(targetObject).(type) {
+	case *map[string]any:
+		m, err := xmlToMap(body)
+		if err != nil {
+			return err
+		}
+		*dest = m
+		return nil
+	case *[]map[string]any:
+		items, err := xmlToMapSlice(body)
+		if err != nil {
+			return err
+		}
+		*dest = items
+		return nil
+	case *any:
+		m, err := xmlToMap(body)
+		if err != nil {
+			return err
+		}
+		*dest = m
+		return nil
+	}
+
+	val := reflect.ValueOf(targetObject)
+	if val.Kind() == reflect.Pointer && !val.IsNil() && val.Elem().Kind() == reflect.Map {
+		m, err := xmlToMap(body)
+		if err != nil {
+			return err
+		}
+		encoded, err := json.Marshal(m)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(encoded, targetObject)
+	}
+
+	return xml.NewDecoder(body).Decode(targetObject)
 }

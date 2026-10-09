@@ -79,6 +79,16 @@ func loadConfigFile(filePath string) (*domain.ServerConfig, error) {
 	}
 	serverConfig.Server.BasePath = normalizeBasePath(serverConfig.Server.BasePath)
 
+	if serverConfig.OpenAPI.Title == "" {
+		serverConfig.OpenAPI.Title = "Conduit API"
+	}
+	if serverConfig.OpenAPI.Version == "" {
+		serverConfig.OpenAPI.Version = "1.0.0"
+	}
+	if serverConfig.OpenAPI.Description == "" {
+		serverConfig.OpenAPI.Description = "Multi-Format, Database-Agnostic REST Engine API documentation automatically generated from relational database schema."
+	}
+
 	return serverConfig, nil
 }
 
@@ -110,6 +120,10 @@ func GenerateDefaultConfig(formatType string, outputFilePath string) error {
 	}
 	defaultConfig.Auth.DBAuth.Cache.Capacity = 10000
 	defaultConfig.Auth.DBAuth.Cache.TTLSeconds = 300
+
+	defaultConfig.OpenAPI.Title = "Conduit API"
+	defaultConfig.OpenAPI.Version = "1.0.0"
+	defaultConfig.OpenAPI.Description = "Multi-Format, Database-Agnostic REST Engine API documentation automatically generated from relational database schema."
 
 	var encodedBytes []byte
 	var marshalError error
