@@ -13,41 +13,41 @@ Point it at a database, start the server, and your tables become live REST endpo
 
 ## ✨ Key Features
 
-- **Multi‑Format Input & Output**
+- **Multi‑Format Input & Output**  
   JSON, XML, YAML, TOML, NDJSON, CSV, and CBOR — all first‑class citizens with automatic content negotiation and query overrides (`?format=`).
 
-- **Database‑Agnostic Architecture**
+- **Database‑Agnostic Architecture**  
   Official drivers for SQLite, PostgreSQL, MySQL/MariaDB, SQL Server, libSQL/Turso, ClickHouse, and Oracle Database, plus an in-memory testing driver.
   Swap databases or authorization modules without changing your API.
 
-- **Zero‑Code REST API Generation**
+- **Zero‑Code REST API Generation**  
   Every database table automatically becomes a typed REST endpoint supporting `GET`, `POST`, `PUT`, `PATCH`, and `DELETE`.
 
-- **SQL‑Like Query Filtering & Sorting**
+- **SQL‑Like Query Filtering & Sorting**  
   Powerful `?where=` expressions (with `=`, `!=`, `<`, `>`, `<=`, `>=`, `LIKE`, `IN`, `NOT IN`, `IS NULL`, `IS NOT NULL`, `AND`, `OR`, `NOT`, and parenthetical grouping) and `?order=` sorting compiled into secure parameterized SQL.
 
-- **Dynamic Schema API**
+- **Dynamic Schema API**  
   Introspect database catalogs (`GET /v1/schema`), inspect table column definitions (`GET /v1/schema/<table>`), create tables (`POST /v1/schema/<table>`), or drop tables (`DELETE /v1/schema/<table>`) via HTTP.
 
-- **Strong Typing With Graceful Fallback**
+- **Strong Typing With Graceful Fallback**  
   SQL types are preserved when possible; incompatible types (e.g., datetime) are safely represented as strings.
 
-- **Automated OpenAPI 3.0 & Interactive Docs**
+- **Automated OpenAPI 3.0 & Interactive Docs**  
   Real-time OpenAPI 3.0 JSON specification at `/v1/openapi.json` and interactive Scalar API documentation at `/v1/docs`. Exportable via `--export-openapi` for CI/CD pipelines.
 
-- **Pluggable Authorization & Security Policies**
+- **Pluggable Authorization & Security Policies**  
   Protect data using environment variable tokens, database-backed token tables with high-speed LRU caching, or permissive No-Op mode with global unauthenticated policy flags.
 
-- **High Performance LRU Caching**
+- **High Performance LRU Caching**  
   Thread-safe in-memory caching for compiled WHERE ASTs, query metadata, and auth tokens.
 
-- **Config‑Driven Behavior**
+- **Config‑Driven Behavior**  
   Auto-detects configuration files in JSON, YAML, TOML, or XML.
 
-- **Simple Deployment**
+- **Simple Deployment**  
   Single static binary or `go install`.
 
-- **MIT‑Licensed Open Core**
+- **MIT‑Licensed Open Core**  
   Free to use, extend, and integrate.
 
 ---
@@ -58,7 +58,7 @@ Conduit combines:
 
 - **Multi‑Format I/O**
 - **Database‑Agnostic Routing**
-- **Instant REST Generation**
+- **Instant REST Generation**  
   …into a single engine that requires **no code** to expose a fully functional API.
 
 It's ideal for:
@@ -133,8 +133,6 @@ go build -o conduit ./cmd/server
 ---
 
 ## ⚙️ Configuration
-
-Conduit automatically searches for a config file in this order:
 
 Conduit automatically searches for a configuration file in this order:
 
