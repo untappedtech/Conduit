@@ -75,8 +75,8 @@ Inspects incoming `Content-Type` headers and converts raw HTTP request bodies in
 Provides clean path mapping:
 
 - `/v1/schema` and `/v1/schema/<table>` for schema introspection and DDL management.
-- `/v1/<table>` and `/v1/<table>/<id>` for CRUD data manipulation.
-- `/v1/openapi.json` and `/v1/docs` for OpenAPI specs and interactive documentation UI.
+- `/v1/data/<table>` and `/v1/data/<table>/<id>` for dynamic CRUD data manipulation.
+- `/v1/openapi.json` and `/v1/docs` for OpenAPI specs and interactive documentation UI (mounted when `enable_docs: true`).
 
 ### 3. Authorization Chain (`internal/auth`)
 

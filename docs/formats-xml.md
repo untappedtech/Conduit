@@ -15,7 +15,7 @@ To submit XML data, set `Content-Type: application/xml` or `Content-Type: text/x
 ### Single Record (POST / PUT)
 
 ```bash
-curl -X POST http://localhost:8080/v1/books \
+curl -X POST http://localhost:8080/v1/data/books \
   -H "Content-Type: application/xml" \
   -d '<?xml version="1.0" encoding="UTF-8"?>
 <book>
@@ -30,7 +30,7 @@ Conduit's robust XML decoder parses records regardless of the enclosing root tag
 ### Batch Ingestion (POST)
 
 ```bash
-curl -X POST http://localhost:8080/v1/books \
+curl -X POST http://localhost:8080/v1/data/books \
   -H "Content-Type: application/xml" \
   -d '<?xml version="1.0" encoding="UTF-8"?>
 <books>
@@ -52,7 +52,7 @@ curl -X POST http://localhost:8080/v1/books \
 Request XML output using `?format=xml` or the `Accept: application/xml` header:
 
 ```bash
-curl http://localhost:8080/v1/books?format=xml
+curl http://localhost:8080/v1/data/books?format=xml
 ```
 
 ### List Response
@@ -79,7 +79,7 @@ List responses are enveloped in `<response>` with child `<item>` elements matchi
 
 ### Single Record Response
 
-Single record lookups (`GET /v1/books/1?format=xml`) render a concise document:
+Single record lookups (`GET /v1/data/books/1?format=xml`) render a concise document:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>

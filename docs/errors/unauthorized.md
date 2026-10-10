@@ -32,7 +32,7 @@ The endpoint or operation requires authentication because public access has been
 ### Request
 
 ```http
-POST /v1/books
+POST /v1/data/books
 Content-Type: application/json
 
 {"title": "Dune"}

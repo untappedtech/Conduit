@@ -11,7 +11,7 @@ func TestHTTP_InsertCSV(t *testing.T) {
 	srv := setupTestHTTPServer()
 	createSportsSchema(t, srv)
 
-	insertReq := httptest.NewRequest(http.MethodPost, "/v1/sports", strings.NewReader("name,players,created_at\nGolf,4,2026-08-11 17:57:30"))
+	insertReq := httptest.NewRequest(http.MethodPost, "/v1/data/sports", strings.NewReader("name,players,created_at\nGolf,4,2026-08-11 17:57:30"))
 	insertReq.Header.Set("Content-Type", "text/csv")
 	insertRec := httptest.NewRecorder()
 	srv.ServeHTTP(insertRec, insertReq)
@@ -25,7 +25,7 @@ func TestHTTP_InsertCSV(t *testing.T) {
 		t.Fatalf("expected Golf in CSV insert response, got:\n%s", insertRec.Body.String())
 	}
 
-	getReq := httptest.NewRequest(http.MethodGet, "/v1/sports/1?format=json", nil)
+	getReq := httptest.NewRequest(http.MethodGet, "/v1/data/sports/1?format=json", nil)
 	getRec := httptest.NewRecorder()
 	srv.ServeHTTP(getRec, getReq)
 	if getRec.Code != http.StatusOK {
@@ -41,7 +41,7 @@ func TestHTTP_PatchCSV(t *testing.T) {
 	createSportsSchema(t, srv)
 	insertSportsRecords(t, srv)
 
-	patchReq := httptest.NewRequest(http.MethodPatch, "/v1/sports/1", strings.NewReader("players\n9"))
+	patchReq := httptest.NewRequest(http.MethodPatch, "/v1/data/sports/1", strings.NewReader("players\n9"))
 	patchReq.Header.Set("Content-Type", "text/csv")
 	patchRec := httptest.NewRecorder()
 	srv.ServeHTTP(patchRec, patchReq)
@@ -52,7 +52,7 @@ func TestHTTP_PatchCSV(t *testing.T) {
 		t.Fatalf("expected name to remain Golf after CSV PATCH, got:\n%s", patchRec.Body.String())
 	}
 
-	getReq := httptest.NewRequest(http.MethodGet, "/v1/sports/1?format=json", nil)
+	getReq := httptest.NewRequest(http.MethodGet, "/v1/data/sports/1?format=json", nil)
 	getRec := httptest.NewRecorder()
 	srv.ServeHTTP(getRec, getReq)
 	body := getRec.Body.String()
@@ -78,7 +78,7 @@ func TestHTTP_CreateSchemaCSV(t *testing.T) {
 		t.Fatalf("expected created columns in response, got:\n%s", rec.Body.String())
 	}
 
-	insertReq := httptest.NewRequest(http.MethodPost, "/v1/teams", strings.NewReader(`{"name":"Aces"}`))
+	insertReq := httptest.NewRequest(http.MethodPost, "/v1/data/teams", strings.NewReader(`{"name":"Aces"}`))
 	insertReq.Header.Set("Content-Type", "application/json")
 	insertRec := httptest.NewRecorder()
 	srv.ServeHTTP(insertRec, insertReq)

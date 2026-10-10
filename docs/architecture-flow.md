@@ -52,15 +52,19 @@ When a request arrives, the **Format Decoder** inspects the `Content-Type` heade
 - If body contains JSON, YAML, TOML, XML, CSV, NDJSON, or CBOR, it is parsed into normalized Go types (`map[string]any` or `[]map[string]any`).
 - Query parameters (`where`, `order`, `limit`, `offset`, `format`) are extracted from the URL.
 
-### 2. Route Matching
+### 2. Rate Limiting
+
+If `rate_limit.enabled: true`, the **Rate Limiter Middleware** evaluates the incoming request against a Token Bucket keyed by client token or IP address before authentication or database work begins.
+
+### 3. Route Matching
 
 The **HTTP Router** checks the request against configured base paths:
 
 - `/v1/schema` → Schema management routes (`handleSchema`).
-- `/v1/docs` & `/v1/openapi.json` → Documentation and OpenAPI specs.
-- `/v1/<table>` & `/v1/<table>/<id>` → Data routes (`handleCRUD`).
+- `/v1/docs` & `/v1/openapi.json` → Documentation and OpenAPI specs (active when `enable_docs: true`).
+- `/v1/data/<table>` & `/v1/data/<table>/<id>` → Data routes (`handleCRUD`).
 
-### 3. Authentication & Authorization
+### 4. Authentication & Authorization
 
 The **Authorization Chain** runs:
 

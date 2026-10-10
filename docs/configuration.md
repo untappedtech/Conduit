@@ -39,11 +39,20 @@ conduit --generate-config xml    # Creates config.xml
 
 ## Configuration Sections
 
-The configuration file is divided into five core sections:
+The configuration file is divided into core operational sections:
 
 ```yaml
 server:
     # Network binding, ports, routing base path, and query limits
+
+enable_docs: false
+# Interactive Scalar UI (/docs) and OpenAPI 3.0 spec (/openapi.json)
+
+max_query_depth: 5
+# Maximum allowed parenthetical nesting depth in ?where= filter ASTs
+
+rate_limit:
+    # Token Bucket rate limiter (requests_per_second and burst capacity)
 
 database:
     # Operational database engine driver and DSN connection string
@@ -58,7 +67,8 @@ openapi:
     # Interactive documentation and OpenAPI 3.0 specification metadata
 ```
 
-- [Server Settings](config-server.md) — Host, port, base path, and default pagination limit.
+- [Server Settings](config-server.md) — Host, port, base path, `enable_docs`, `max_query_depth`, and default pagination limit.
+- [Rate Limiting](config-ratelimit.md) — Token bucket throughput constraints, proxy IP resolution, and client keying.
 - [Database Settings](config-database.md) — Drivers (SQLite, PostgreSQL, MySQL, SQL Server, libSQL, ClickHouse, Oracle, Memory) and DSN syntax.
 - [Policy Settings](config-policy.md) — Public access permissions (`publicReads`, `publicWrites`, `publicMutation`).
 - [Authorization Overview](config-auth.md) — Auth strategies, token extractors, and role enforcement.
@@ -76,6 +86,14 @@ server:
     port: 8080
     base_path: "/v1/"
     default_limit: 50
+
+enable_docs: true
+max_query_depth: 5
+
+rate_limit:
+    enabled: true
+    requests_per_second: 100
+    burst: 200
 
 database:
     driver: "sqlite"
@@ -130,6 +148,13 @@ openapi:
         "port": 8080,
         "base_path": "/v1/",
         "default_limit": 50
+    },
+    "enable_docs": true,
+    "max_query_depth": 5,
+    "rate_limit": {
+        "enabled": true,
+        "requests_per_second": 100,
+        "burst": 200
     },
     "database": {
         "driver": "postgres",

@@ -103,10 +103,16 @@ type OpenAPIConfig struct {
 	Title          string                `json:"title,omitempty" yaml:"title,omitempty" xml:"title,omitempty" toml:"title,omitempty"`
 	Version        string                `json:"version,omitempty" yaml:"version,omitempty" xml:"version,omitempty" toml:"version,omitempty"`
 	Description    string                `json:"description,omitempty" yaml:"description,omitempty" xml:"description,omitempty" toml:"description,omitempty"`
-	TermsOfService string                `json:"terms_of_service,omitempty" yaml:"terms_of_service,omitempty" xml:"terms_of_service,omitempty" toml:"terms_of_service,omitempty"`
+	TermsOfService string                `json:"terms_of_service,omitempty" json2:"termsOfService,omitempty" yaml:"terms_of_service,omitempty" xml:"terms_of_service,omitempty" toml:"terms_of_service,omitempty"`
 	Contact        *OpenAPIContactConfig `json:"contact,omitempty" yaml:"contact,omitempty" xml:"contact,omitempty" toml:"contact,omitempty"`
 	License        *OpenAPILicenseConfig `json:"license,omitempty" yaml:"license,omitempty" xml:"license,omitempty" toml:"license,omitempty"`
 	Servers        []OpenAPIServerConfig `json:"servers,omitempty" yaml:"servers,omitempty" xml:"servers,omitempty" toml:"servers,omitempty"`
+}
+
+type RateLimitConfig struct {
+	Enabled           bool    `json:"enabled" yaml:"enabled" xml:"enabled" toml:"enabled"`
+	RequestsPerSecond float64 `json:"requests_per_second" yaml:"requests_per_second" xml:"requests_per_second" toml:"requests_per_second"`
+	Burst             int     `json:"burst" yaml:"burst" xml:"burst" toml:"burst"`
 }
 
 type ServerConfig struct {
@@ -117,8 +123,11 @@ type ServerConfig struct {
 		BasePath     string `json:"base_path" yaml:"base_path" xml:"base_path" toml:"base_path"`
 		DefaultLimit int    `json:"default_limit" yaml:"default_limit" xml:"default_limit" toml:"default_limit"`
 	} `json:"server" yaml:"server" xml:"server" toml:"server"`
-	Database DatabaseConfig `json:"database" yaml:"database" xml:"database" toml:"database"`
-	Policy   PolicyConfig   `json:"policy" yaml:"policy" xml:"policy" toml:"policy"`
-	Auth     AuthConfig     `json:"auth" yaml:"auth" xml:"auth" toml:"auth"`
-	OpenAPI  OpenAPIConfig  `json:"openapi,omitempty" yaml:"openapi,omitempty" xml:"openapi,omitempty" toml:"openapi,omitempty"`
+	EnableDocs    bool            `json:"enable_docs" yaml:"enable_docs" xml:"enable_docs" toml:"enable_docs"`
+	MaxQueryDepth int             `json:"max_query_depth" yaml:"max_query_depth" xml:"max_query_depth" toml:"max_query_depth"`
+	RateLimit     RateLimitConfig `json:"rate_limit" yaml:"rate_limit" xml:"rate_limit" toml:"rate_limit"`
+	Database      DatabaseConfig  `json:"database" yaml:"database" xml:"database" toml:"database"`
+	Policy        PolicyConfig    `json:"policy" yaml:"policy" xml:"policy" toml:"policy"`
+	Auth          AuthConfig      `json:"auth" yaml:"auth" xml:"auth" toml:"auth"`
+	OpenAPI       OpenAPIConfig   `json:"openapi,omitempty" yaml:"openapi,omitempty" xml:"openapi,omitempty" toml:"openapi,omitempty"`
 }

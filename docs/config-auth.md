@@ -24,7 +24,7 @@ Conduit extracts credentials from requests in the following order:
    ```
 4. **`api_key` or `token` Query Parameter:**
    ```
-   GET /v1/books?token=<token>
+   GET /v1/data/books?token=<token>
    ```
 
 ---

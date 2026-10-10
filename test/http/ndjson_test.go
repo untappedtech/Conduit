@@ -13,7 +13,7 @@ func TestHTTP_NDJSONStreaming_MultiRow(t *testing.T) {
 	createSportsSchema(t, srv)
 	insertSportsRecords(t, srv)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/sports?format=ndjson", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/data/sports?format=ndjson", nil)
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
 
@@ -33,7 +33,7 @@ func TestHTTP_NDJSONStreaming_MultiRow(t *testing.T) {
 func TestHTTP_NDJSONErrorShape(t *testing.T) {
 	srv := setupTestHTTPServer()
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/sports/999?format=ndjson", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/data/sports/999?format=ndjson", nil)
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
 	body := strings.TrimSpace(rec.Body.String())

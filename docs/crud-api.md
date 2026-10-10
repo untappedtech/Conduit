@@ -10,21 +10,21 @@ All endpoints support JSON, XML, YAML, TOML, NDJSON, CSV, and CBOR.
 
 | Method   | Endpoint           | Description                                              |
 | -------- | ------------------ | -------------------------------------------------------- |
-| `GET`    | `/v1/<table>`      | List records with filtering, sorting, and pagination.    |
-| `GET`    | `/v1/<table>/<id>` | Fetch a single record by its primary key.                |
-| `POST`   | `/v1/<table>`      | Insert a new record (or batch insert).                   |
-| `PUT`    | `/v1/<table>/<id>` | Replace an existing record entirely.                     |
-| `PATCH`  | `/v1/<table>/<id>` | Partially update specified fields on an existing record. |
-| `DELETE` | `/v1/<table>/<id>` | Delete a record by its primary key.                      |
+| `GET`    | `/v1/data/<table>`      | List records with filtering, sorting, and pagination.    |
+| `GET`    | `/v1/data/<table>/<id>` | Fetch a single record by its primary key.                |
+| `POST`   | `/v1/data/<table>`      | Insert a new record (or batch insert).                   |
+| `PUT`    | `/v1/data/<table>/<id>` | Replace an existing record entirely.                     |
+| `PATCH`  | `/v1/data/<table>/<id>` | Partially update specified fields on an existing record. |
+| `DELETE` | `/v1/data/<table>/<id>` | Delete a record by its primary key.                      |
 
 ---
 
-## 1. List Records (`GET /v1/<table>`)
+## 1. List Records (`GET /v1/data/<table>`)
 
 Retrieves multiple records matching query criteria.
 
 ```bash
-curl http://localhost:8080/v1/players
+curl http://localhost:8080/v1/data/players
 ```
 
 ### Supported Query Parameters
@@ -40,17 +40,17 @@ curl http://localhost:8080/v1/players
 ### Complex Query Example
 
 ```bash
-curl "http://localhost:8080/v1/players?where=score%20%3E%3D%2050&order=score:desc&limit=10&offset=0&format=yaml"
+curl "http://localhost:8080/v1/data/players?where=score%20%3E%3D%2050&order=score:desc&limit=10&offset=0&format=yaml"
 ```
 
 ---
 
-## 2. Retrieve Single Record (`GET /v1/<table>/<id>`)
+## 2. Retrieve Single Record (`GET /v1/data/<table>/<id>`)
 
 Fetches a specific record identified by its primary key value.
 
 ```bash
-curl http://localhost:8080/v1/players/42
+curl http://localhost:8080/v1/data/players/42
 ```
 
 ### Response Example (JSON)
@@ -68,14 +68,14 @@ If no record exists matching the primary key, Conduit returns `404 Not Found`.
 
 ---
 
-## 3. Insert Record (`POST /v1/<table>`)
+## 3. Insert Record (`POST /v1/data/<table>`)
 
 Inserts one or more records into the table.
 
 ### Single Record Insert
 
 ```bash
-curl -X POST http://localhost:8080/v1/players \
+curl -X POST http://localhost:8080/v1/data/players \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Connor McDavid",
@@ -89,7 +89,7 @@ curl -X POST http://localhost:8080/v1/players \
 Conduit supports inserting an array or stream of records:
 
 ```bash
-curl -X POST http://localhost:8080/v1/players \
+curl -X POST http://localhost:8080/v1/data/players \
   -H "Content-Type: application/json" \
   -d '[
     {"name": "Sidney Crosby", "number": 87, "team_id": 4},
@@ -101,12 +101,12 @@ Returns HTTP `201 Created` with the inserted record(s), including newly assigned
 
 ---
 
-## 4. Replace Record (`PUT /v1/<table>/<id>`)
+## 4. Replace Record (`PUT /v1/data/<table>/<id>`)
 
 Replaces the entire record at `<id>`. All non-nullable columns must be provided in the payload.
 
 ```bash
-curl -X PUT http://localhost:8080/v1/players/42 \
+curl -X PUT http://localhost:8080/v1/data/players/42 \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Wayne Gretzky",
@@ -119,12 +119,12 @@ Returns HTTP `200 OK` with the updated record.
 
 ---
 
-## 5. Partial Update (`PATCH /v1/<table>/<id>`)
+## 5. Partial Update (`PATCH /v1/data/<table>/<id>`)
 
 Updates only the columns included in the request body, leaving untouched fields unmodified.
 
 ```bash
-curl -X PATCH http://localhost:8080/v1/players/42 \
+curl -X PATCH http://localhost:8080/v1/data/players/42 \
   -H "Content-Type: application/json" \
   -d '{
     "team_id": 15
@@ -135,12 +135,12 @@ Returns HTTP `200 OK` with the updated record.
 
 ---
 
-## 6. Delete Record (`DELETE /v1/<table>/<id>`)
+## 6. Delete Record (`DELETE /v1/data/<table>/<id>`)
 
 Deletes the record identified by `<id>`.
 
 ```bash
-curl -X DELETE http://localhost:8080/v1/players/42
+curl -X DELETE http://localhost:8080/v1/data/players/42
 ```
 
 Returns HTTP `204 No Content` upon successful deletion. If the record does not exist, returns `404 Not Found`.

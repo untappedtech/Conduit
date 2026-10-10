@@ -97,7 +97,7 @@ curl -X POST http://localhost:8080/v1/schema/tasks \
 ### Insert Data
 
 ```bash
-curl -X POST http://localhost:8080/v1/tasks \
+curl -X POST http://localhost:8080/v1/data/tasks \
   -H "Content-Type: application/json" \
   -d '{"title": "Try Conduit", "completed": false}'
 ```
@@ -106,18 +106,18 @@ curl -X POST http://localhost:8080/v1/tasks \
 
 ```bash
 # Fetch as JSON (default)
-curl http://localhost:8080/v1/tasks
+curl http://localhost:8080/v1/data/tasks
 
 # Fetch as CSV
-curl http://localhost:8080/v1/tasks?format=csv
+curl http://localhost:8080/v1/data/tasks?format=csv
 
 # Fetch as YAML
-curl http://localhost:8080/v1/tasks?format=yaml
+curl http://localhost:8080/v1/data/tasks?format=yaml
 ```
 
 ### Interactive API Documentation
 
-Conduit automatically provides interactive API documentation powered by Scalar and OpenAPI 3.0 at:
+When `enable_docs: true` is enabled in configuration, Conduit automatically serves an embedded interactive API documentation browser powered by Scalar and OpenAPI 3.0:
 
 - **Interactive UI**: `http://localhost:8080/v1/docs` (or `http://localhost:8080/docs`)
 - **OpenAPI 3.0 JSON Spec**: `http://localhost:8080/v1/openapi.json` (or `http://localhost:8080/openapi.json`)

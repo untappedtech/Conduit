@@ -1,6 +1,6 @@
 # Pagination
 
-Conduit uses offset-based pagination for all list endpoints (`GET /v1/<table>`). Pagination works across every table and every supported output format.
+Conduit uses offset-based pagination for all list endpoints (`GET /v1/data/<table>`). Pagination works across every table and every supported output format.
 
 ---
 
@@ -20,7 +20,7 @@ Conduit uses offset-based pagination for all list endpoints (`GET /v1/<table>`).
 Request the first 20 records:
 
 ```bash
-GET /v1/books?limit=20
+GET /v1/data/books?limit=20
 ```
 
 ### Subsequent Pages
@@ -29,10 +29,10 @@ Use `offset` to page through larger datasets:
 
 ```bash
 # Page 2 (rows 21-40)
-GET /v1/books?limit=20&offset=20
+GET /v1/data/books?limit=20&offset=20
 
 # Page 3 (rows 41-60)
-GET /v1/books?limit=20&offset=40
+GET /v1/data/books?limit=20&offset=40
 ```
 
 ---
@@ -42,7 +42,7 @@ GET /v1/books?limit=20&offset=40
 When clients need to stream or dump an entire dataset in a single request, pass `limit=0`:
 
 ```bash
-GET /v1/books?limit=0&format=csv
+GET /v1/data/books?limit=0&format=csv
 ```
 
 This bypasses default limit constraints and returns all records matching any applied `where` filters.
@@ -59,7 +59,7 @@ Pagination executes cleanly alongside sorting (`order`) and filtering (`where`).
 4. Apply `limit` to cap result count.
 
 ```bash
-GET /v1/customers?where=active = true&order=created_at:desc&limit=25&offset=50
+GET /v1/data/customers?where=active = true&order=created_at:desc&limit=25&offset=50
 ```
 
 ---

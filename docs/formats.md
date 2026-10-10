@@ -45,14 +45,14 @@ The `?format=` parameter takes highest precedence:
 - `?format=cbor`
 
 ```bash
-curl http://localhost:8080/v1/players?format=toml
+curl http://localhost:8080/v1/data/players?format=toml
 ```
 
 ### 2. HTTP `Accept` Header
 If no query parameter is provided, Conduit matches the `Accept` header:
 
 ```bash
-curl -H "Accept: application/x-yaml" http://localhost:8080/v1/players
+curl -H "Accept: application/x-yaml" http://localhost:8080/v1/data/players
 ```
 
 ### 3. Echoing Request Body Format
@@ -69,12 +69,12 @@ Conduit decodes incoming payloads into typed Go records and validates them again
 
 ```bash
 # Insert via JSON
-curl -X POST http://localhost:8080/v1/players \
+curl -X POST http://localhost:8080/v1/data/players \
   -H "Content-Type: application/json" \
   -d '{"name": "Alice", "score": 100}'
 
 # Insert via YAML
-curl -X POST http://localhost:8080/v1/players \
+curl -X POST http://localhost:8080/v1/data/players \
   -H "Content-Type: application/x-yaml" \
   -d '
 name: Bob
@@ -82,7 +82,7 @@ score: 85
 '
 
 # Insert via CSV
-curl -X POST http://localhost:8080/v1/players \
+curl -X POST http://localhost:8080/v1/data/players \
   -H "Content-Type: text/csv" \
   -d 'name,score
 Charlie,92'

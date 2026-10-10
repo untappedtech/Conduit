@@ -4,11 +4,14 @@ Conduit automatically inspects your active relational database schema and produc
 
 There is no manual schema drafting or synchronization required. When database tables are created or dropped, the documentation and OpenAPI specification update in real time.
 
+> [!NOTE]
+> Serving the interactive documentation UI and OpenAPI JSON endpoint over HTTP requires setting `enable_docs: true` in your Conduit configuration file. By default, `enable_docs` is `false` for production security and minimal attack surface.
+
 ---
 
 ## Interactive Documentation Browser
 
-Conduit serves the interactive documentation user interface at:
+When `enable_docs: true` is enabled, Conduit serves the interactive documentation user interface via a lightweight (~1KB) embedded HTML shell powered by Scalar at:
 
 ```
 GET /v1/docs
@@ -18,7 +21,7 @@ GET /v1/docs
 
 Visiting this URL in any modern web browser opens the Scalar API reference interface, providing:
 
-- Full endpoint catalog for all database tables and schema management operations.
+- Full endpoint catalog for all dynamic CRUD routes (`/v1/data/<table>`) and schema management operations (`/v1/schema`).
 - Interactive request runner to test queries, filters, and mutations live against the database.
 - Schema definitions showing table columns, SQL data types, nullability, defaults, and primary keys.
 - Example payloads across all supported formats (JSON, XML, YAML, TOML, NDJSON, CSV, CBOR).
@@ -27,7 +30,7 @@ Visiting this URL in any modern web browser opens the Scalar API reference inter
 
 ## OpenAPI Specification Endpoint
 
-The machine-readable OpenAPI 3.0.3 JSON document is available at:
+When `enable_docs: true` is enabled, the machine-readable OpenAPI 3.0.3 JSON document is available at:
 
 ```
 GET /v1/openapi.json

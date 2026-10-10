@@ -12,7 +12,7 @@ func TestHTTP_FormatNegotiation_QueryOverridesInput(t *testing.T) {
 	createSportsSchema(t, srv)
 	insertSportsRecords(t, srv)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/sports?format=json", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/data/sports?format=json", nil)
 	req.Header.Set("Accept", "application/x-yaml")
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
@@ -27,7 +27,7 @@ func TestHTTP_FormatNegotiation_InputDefault(t *testing.T) {
 	createSportsSchema(t, srv)
 	insertSportsRecords(t, srv)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/sports", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/data/sports", nil)
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
 
@@ -41,7 +41,7 @@ func TestHTTP_FormatNegotiation_CSVNotDefault(t *testing.T) {
 	createSportsSchema(t, srv)
 	insertSportsRecords(t, srv)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/sports", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/data/sports", nil)
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
 

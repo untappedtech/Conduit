@@ -32,7 +32,7 @@ Authentication succeeded, but the caller's role does not allow this operation. F
 ### Request
 
 ```http
-DELETE /v1/books/42
+DELETE /v1/data/books/42
 Authorization: Bearer ro-token-12345
 ```
 

@@ -8,16 +8,19 @@ import (
 )
 
 const (
-	maxExprLength   = 65536
-	maxTokens       = 5000
-	maxNestingDepth = 100
+	maxExprLength        = 65536
+	maxTokens            = 5000
+	maxNestingDepth      = 100
+	DefaultMaxQueryDepth = 5
 )
 
 type parser struct {
-	tokens []token
-	pos    int
-	cols   []domain.ColumnDef
-	depth  int
+	tokens        []token
+	pos           int
+	cols          []domain.ColumnDef
+	depth         int
+	parenDepth    int
+	maxQueryDepth int
 }
 
 func (p *parser) enter() error {
@@ -121,6 +124,10 @@ func (p *parser) parsePrimary() (WhereExpr, error) {
 
 	if tok.typ == tokLParen {
 		p.next()
+		p.parenDepth++
+		if p.parenDepth > p.maxQueryDepth {
+			return nil, &QueryTooComplexError{Depth: p.parenDepth, MaxDepth: p.maxQueryDepth}
+		}
 		expr, err := p.parseOr()
 		if err != nil {
 			return nil, err
@@ -129,6 +136,7 @@ func (p *parser) parsePrimary() (WhereExpr, error) {
 			return nil, &MalformedQueryError{Message: "expected closing parenthesis ')'"}
 		}
 		p.next()
+		p.parenDepth--
 		return expr, nil
 	}
 
@@ -238,7 +246,12 @@ func (p *parser) parseInClause(column string, not bool) (WhereExpr, error) {
 }
 
 // ParseWhere parses a WHERE expression string into an AST, validating column names against table schema.
-func ParseWhere(expr string, columns []domain.ColumnDef) (WhereExpr, error) {
+func ParseWhere(expr string, columns []domain.ColumnDef, maxQueryDepth ...int) (WhereExpr, error) {
+	depthLimit := DefaultMaxQueryDepth
+	if len(maxQueryDepth) > 0 && maxQueryDepth[0] > 0 {
+		depthLimit = maxQueryDepth[0]
+	}
+
 	if len(expr) > maxExprLength {
 		return nil, &MalformedQueryError{Message: fmt.Sprintf("where clause exceeds maximum length of %d bytes", maxExprLength)}
 	}
@@ -248,7 +261,7 @@ func ParseWhere(expr string, columns []domain.ColumnDef) (WhereExpr, error) {
 		return nil, nil
 	}
 
-	cacheKey := computeASTCacheKey(trimmed, columns)
+	cacheKey := computeASTCacheKey(trimmed, columns, depthLimit)
 	if cached, ok := getCachedAST(cacheKey); ok {
 		return cached, nil
 	}
@@ -273,7 +286,7 @@ func ParseWhere(expr string, columns []domain.ColumnDef) (WhereExpr, error) {
 		return nil, nil
 	}
 
-	p := &parser{tokens: tokens, cols: columns}
+	p := &parser{tokens: tokens, cols: columns, maxQueryDepth: depthLimit}
 	ast, err := p.parseOr()
 	if err != nil {
 		return nil, err

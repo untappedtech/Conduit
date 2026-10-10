@@ -29,7 +29,7 @@ func TestHTTP_ListFormats_All(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		req := httptest.NewRequest(http.MethodGet, "/v1/sports?format="+tc.format, nil)
+		req := httptest.NewRequest(http.MethodGet, "/v1/data/sports?format="+tc.format, nil)
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
 
@@ -65,7 +65,7 @@ func TestHTTP_SingleRecordFormats_All(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		req := httptest.NewRequest(http.MethodGet, "/v1/sports/1?format="+tc.format, nil)
+		req := httptest.NewRequest(http.MethodGet, "/v1/data/sports/1?format="+tc.format, nil)
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
 
@@ -90,12 +90,12 @@ func TestHTTP_ErrorFormats_All(t *testing.T) {
 		expectSnip []string
 	}
 	cases := []testCase{
-		{"json", "/v1/sports/999?format=json", []string{`"title": "Not Found"`, `"status": 404`}},
-		{"yaml", "/v1/sports/999?format=yaml", []string{`title: "Not Found"`, `status: 404`}},
-		{"toml", "/v1/sports/999?format=toml", []string{`title = "Not Found"`, `status = 404`}},
-		{"xml", "/v1/sports/999?format=xml", []string{"<response>", "<status>404</status>", "<title>Not Found</title>"}},
-		{"ndjson", "/v1/sports/999?format=ndjson", []string{`"title":"Not Found"`, `"status":404`}},
-		{"csv", "/v1/sports/999?format=csv", []string{"title,Not Found", "status,404"}},
+		{"json", "/v1/data/sports/999?format=json", []string{`"title": "Not Found"`, `"status": 404`}},
+		{"yaml", "/v1/data/sports/999?format=yaml", []string{`title: "Not Found"`, `status: 404`}},
+		{"toml", "/v1/data/sports/999?format=toml", []string{`title = "Not Found"`, `status = 404`}},
+		{"xml", "/v1/data/sports/999?format=xml", []string{"<response>", "<status>404</status>", "<title>Not Found</title>"}},
+		{"ndjson", "/v1/data/sports/999?format=ndjson", []string{`"title":"Not Found"`, `"status":404`}},
+		{"csv", "/v1/data/sports/999?format=csv", []string{"title,Not Found", "status,404"}},
 	}
 
 	for _, tc := range cases {
@@ -154,7 +154,7 @@ func TestHTTP_XMLNaming(t *testing.T) {
 	createSportsSchema(t, srv)
 	insertSportsRecords(t, srv)
 
-	reqList := httptest.NewRequest(http.MethodGet, "/v1/sports?format=xml", nil)
+	reqList := httptest.NewRequest(http.MethodGet, "/v1/data/sports?format=xml", nil)
 	recList := httptest.NewRecorder()
 	srv.ServeHTTP(recList, reqList)
 	bodyList := recList.Body.String()
@@ -176,7 +176,7 @@ func TestHTTP_TOMLSingleVsMulti(t *testing.T) {
 	createSportsSchema(t, srv)
 	insertSportsRecords(t, srv)
 
-	reqSingle := httptest.NewRequest(http.MethodGet, "/v1/sports/1?format=toml", nil)
+	reqSingle := httptest.NewRequest(http.MethodGet, "/v1/data/sports/1?format=toml", nil)
 	recSingle := httptest.NewRecorder()
 	srv.ServeHTTP(recSingle, reqSingle)
 	bodySingle := recSingle.Body.String()
@@ -184,7 +184,7 @@ func TestHTTP_TOMLSingleVsMulti(t *testing.T) {
 		t.Fatalf("expected single-record TOML to contain [sports], got:\n%s", bodySingle)
 	}
 
-	reqMulti := httptest.NewRequest(http.MethodGet, "/v1/sports?format=toml", nil)
+	reqMulti := httptest.NewRequest(http.MethodGet, "/v1/data/sports?format=toml", nil)
 	recMulti := httptest.NewRecorder()
 	srv.ServeHTTP(recMulti, reqMulti)
 	bodyMulti := recMulti.Body.String()
@@ -198,7 +198,7 @@ func TestHTTP_YAMLMappingVsSequence(t *testing.T) {
 	createSportsSchema(t, srv)
 	insertSportsRecords(t, srv)
 
-	reqSingle := httptest.NewRequest(http.MethodGet, "/v1/sports/1?format=yaml", nil)
+	reqSingle := httptest.NewRequest(http.MethodGet, "/v1/data/sports/1?format=yaml", nil)
 	recSingle := httptest.NewRecorder()
 	srv.ServeHTTP(recSingle, reqSingle)
 	bodySingle := recSingle.Body.String()
@@ -206,7 +206,7 @@ func TestHTTP_YAMLMappingVsSequence(t *testing.T) {
 		t.Fatalf("expected single-record YAML mapping, got:\n%s", bodySingle)
 	}
 
-	reqMulti := httptest.NewRequest(http.MethodGet, "/v1/sports?format=yaml", nil)
+	reqMulti := httptest.NewRequest(http.MethodGet, "/v1/data/sports?format=yaml", nil)
 	recMulti := httptest.NewRecorder()
 	srv.ServeHTTP(recMulti, reqMulti)
 	bodyMulti := recMulti.Body.String()
@@ -220,7 +220,7 @@ func TestHTTP_CSVHeaderOrdering(t *testing.T) {
 	createSportsSchema(t, srv)
 	insertSportsRecords(t, srv)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/sports?format=csv", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/data/sports?format=csv", nil)
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
 	body := rec.Body.String()
@@ -238,7 +238,7 @@ func TestHTTP_SpecialCharacters_AllFormats(t *testing.T) {
 	srv := setupTestHTTPServer()
 	createSportsSchema(t, srv)
 
-	insertReq := httptest.NewRequest(http.MethodPost, "/v1/sports", strings.NewReader(`{"name":"<Golf & \"Fun\" 🏌️>","players":4}`))
+	insertReq := httptest.NewRequest(http.MethodPost, "/v1/data/sports", strings.NewReader(`{"name":"<Golf & \"Fun\" 🏌️>","players":4}`))
 	insertReq.Header.Set("Content-Type", "application/json")
 	insertRec := httptest.NewRecorder()
 	srv.ServeHTTP(insertRec, insertReq)
@@ -248,7 +248,7 @@ func TestHTTP_SpecialCharacters_AllFormats(t *testing.T) {
 
 	formats := []string{"json", "yaml", "toml", "xml", "ndjson", "csv", "cbor"}
 	for _, fmtStr := range formats {
-		req := httptest.NewRequest(http.MethodGet, "/v1/sports/1?format="+fmtStr, nil)
+		req := httptest.NewRequest(http.MethodGet, "/v1/data/sports/1?format="+fmtStr, nil)
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
 		body := rec.Body.Bytes()
@@ -283,7 +283,7 @@ func TestHTTP_ContentTypeHeaders(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		req := httptest.NewRequest(http.MethodGet, "/v1/sports?format="+tc.format, nil)
+		req := httptest.NewRequest(http.MethodGet, "/v1/data/sports?format="+tc.format, nil)
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
 		ct := rec.Header().Get("Content-Type")
@@ -298,7 +298,7 @@ func TestHTTP_CBORFormatAndOrdering(t *testing.T) {
 	createSportsSchema(t, srv)
 	insertSportsRecords(t, srv)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/sports?format=cbor", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/data/sports?format=cbor", nil)
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
 
@@ -336,7 +336,7 @@ func TestHTTP_XML_CRUD(t *testing.T) {
 	createSportsSchema(t, srv)
 
 	// 1. POST record in XML
-	postReq := httptest.NewRequest(http.MethodPost, "/v1/sports", strings.NewReader("<item><name>Tennis</name><players>2</players></item>"))
+	postReq := httptest.NewRequest(http.MethodPost, "/v1/data/sports", strings.NewReader("<item><name>Tennis</name><players>2</players></item>"))
 	postReq.Header.Set("Content-Type", "application/xml")
 	postRec := httptest.NewRecorder()
 	srv.ServeHTTP(postRec, postReq)
@@ -348,7 +348,7 @@ func TestHTTP_XML_CRUD(t *testing.T) {
 	}
 
 	// 2. GET single record in XML
-	getReq := httptest.NewRequest(http.MethodGet, "/v1/sports/1?format=xml", nil)
+	getReq := httptest.NewRequest(http.MethodGet, "/v1/data/sports/1?format=xml", nil)
 	getRec := httptest.NewRecorder()
 	srv.ServeHTTP(getRec, getReq)
 	if getRec.Code != http.StatusOK {
@@ -359,7 +359,7 @@ func TestHTTP_XML_CRUD(t *testing.T) {
 	}
 
 	// 3. PUT update record in XML
-	putReq := httptest.NewRequest(http.MethodPut, "/v1/sports/1", strings.NewReader("<item><name>Tennis Pro</name><players>4</players></item>"))
+	putReq := httptest.NewRequest(http.MethodPut, "/v1/data/sports/1", strings.NewReader("<item><name>Tennis Pro</name><players>4</players></item>"))
 	putReq.Header.Set("Content-Type", "application/xml")
 	putRec := httptest.NewRecorder()
 	srv.ServeHTTP(putRec, putReq)
@@ -371,7 +371,7 @@ func TestHTTP_XML_CRUD(t *testing.T) {
 	}
 
 	// 4. PATCH record in XML
-	patchReq := httptest.NewRequest(http.MethodPatch, "/v1/sports/1", strings.NewReader("<item><players>8</players></item>"))
+	patchReq := httptest.NewRequest(http.MethodPatch, "/v1/data/sports/1", strings.NewReader("<item><players>8</players></item>"))
 	patchReq.Header.Set("Content-Type", "application/xml")
 	patchRec := httptest.NewRecorder()
 	srv.ServeHTTP(patchRec, patchReq)
@@ -383,7 +383,7 @@ func TestHTTP_XML_CRUD(t *testing.T) {
 	}
 
 	// 5. DELETE record
-	delReq := httptest.NewRequest(http.MethodDelete, "/v1/sports/1", nil)
+	delReq := httptest.NewRequest(http.MethodDelete, "/v1/data/sports/1", nil)
 	delRec := httptest.NewRecorder()
 	srv.ServeHTTP(delRec, delReq)
 	if delRec.Code != http.StatusNoContent {

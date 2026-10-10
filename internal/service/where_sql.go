@@ -109,19 +109,24 @@ func (in *InExpr) ToSQL(dialect SQLDialect, startParamIndex int) (string, []any)
 }
 
 // ParseWhereSQL parses a WHERE clause and produces safe SQL and parameter arguments for the given dialect.
-func ParseWhereSQL(expr string, columns []domain.ColumnDef, dialect SQLDialect, startParamIndex int) (string, []any, error) {
+func ParseWhereSQL(expr string, columns []domain.ColumnDef, dialect SQLDialect, startParamIndex int, maxQueryDepth ...int) (string, []any, error) {
 	trimmed := strings.TrimSpace(expr)
 	if trimmed == "" {
 		return "", nil, nil
 	}
 
+	depthLimit := DefaultMaxQueryDepth
+	if len(maxQueryDepth) > 0 && maxQueryDepth[0] > 0 {
+		depthLimit = maxQueryDepth[0]
+	}
+
 	dialect = ensureDialect(dialect)
-	cacheKey := computeSQLCacheKey(trimmed, columns, dialect, startParamIndex)
+	cacheKey := computeSQLCacheKey(trimmed, columns, dialect, startParamIndex, depthLimit)
 	if sql, args, ok := getCachedSQL(cacheKey); ok {
 		return sql, args, nil
 	}
 
-	ast, err := ParseWhere(trimmed, columns)
+	ast, err := ParseWhere(trimmed, columns, depthLimit)
 	if err != nil {
 		return "", nil, err
 	}

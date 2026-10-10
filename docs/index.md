@@ -29,7 +29,8 @@ Conduit is a **zero-boilerplate REST engine** written in Go that instantly expos
 ### Configuration
 
 - [Configuration Overview](configuration.md) — Configuration file detection order, structure, and CLI options.
-- [Server Settings](config-server.md) — Bind address, port, base paths, and pagination limits.
+- [Server Settings](config-server.md) — Bind address, port, base paths, documentation toggle, AST depth limits, and pagination limits.
+- [Rate Limiting](config-ratelimit.md) — Token bucket throughput constraints, proxy IP resolution, and client keying.
 - [Database Settings](config-database.md) — Driver options, DSN connection strings, and driver examples.
 - [Policy Settings](config-policy.md) — Global unauthenticated access permissions (`publicReads`, `publicWrites`, `publicMutation`).
 - [OpenAPI Settings](config-openapi.md) — Metadata, contact, license, servers, and documentation UI customization.

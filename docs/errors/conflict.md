@@ -21,7 +21,7 @@ The database driver rejected an insert or update query because it violates a rel
 ## How to Fix It
 
 1. **Verify Uniqueness:** Ensure values for unique columns (such as usernames, email addresses, or external IDs) are not already present in the database.
-2. **Use Updates Instead of Inserts:** If the record already exists, use `PUT /v1/<table>/<id>` or `PATCH /v1/<table>/<id>` rather than `POST /v1/<table>`.
+2. **Use Updates Instead of Inserts:** If the record already exists, use `PUT /v1/data/<table>/<id>` or `PATCH /v1/data/<table>/<id>` rather than `POST /v1/data/<table>`.
 3. **Inspect Auto-Increment Keys:** For auto-incrementing tables, avoid explicitly providing the primary key field in `POST` payloads.
 
 ---
@@ -31,7 +31,7 @@ The database driver rejected an insert or update query because it violates a rel
 ### Request
 
 ```http
-POST /v1/users
+POST /v1/data/users
 Content-Type: application/json
 
 {

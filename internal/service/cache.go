@@ -38,9 +38,13 @@ func ClearWhereCache() {
 	sqlCacheMu.Unlock()
 }
 
-func computeASTCacheKey(expr string, columns []domain.ColumnDef) uint64 {
+func computeASTCacheKey(expr string, columns []domain.ColumnDef, maxDepth int) uint64 {
 	h := xxhash.New()
 	_, _ = h.WriteString(expr)
+	_, _ = h.WriteString("|")
+	var depthBuf [8]byte
+	binary.LittleEndian.PutUint64(depthBuf[:], uint64(maxDepth))
+	_, _ = h.Write(depthBuf[:])
 	_, _ = h.WriteString("|")
 	for _, col := range columns {
 		_, _ = h.WriteString(col.Name)
@@ -51,9 +55,13 @@ func computeASTCacheKey(expr string, columns []domain.ColumnDef) uint64 {
 	return h.Sum64()
 }
 
-func computeSQLCacheKey(expr string, columns []domain.ColumnDef, dialect SQLDialect, startParamIndex int) uint64 {
+func computeSQLCacheKey(expr string, columns []domain.ColumnDef, dialect SQLDialect, startParamIndex int, maxDepth int) uint64 {
 	h := xxhash.New()
 	_, _ = h.WriteString(expr)
+	_, _ = h.WriteString("|")
+	var depthBuf [8]byte
+	binary.LittleEndian.PutUint64(depthBuf[:], uint64(maxDepth))
+	_, _ = h.Write(depthBuf[:])
 	_, _ = h.WriteString("|")
 	for _, col := range columns {
 		_, _ = h.WriteString(col.Name)

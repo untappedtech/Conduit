@@ -32,7 +32,7 @@ Conduit was able to parse the incoming request format (e.g. valid JSON or YAML),
 ### Request
 
 ```http
-POST /v1/books
+POST /v1/data/books
 Content-Type: application/json
 
 {

@@ -59,7 +59,11 @@ func (apiService *APIService) List(ctx context.Context, tableName string, req do
 			}
 		}
 		if req.Where != "" {
-			if _, err := ParseWhere(req.Where, schema); err != nil {
+			maxDepth := DefaultMaxQueryDepth
+			if apiService.serverConfig != nil && apiService.serverConfig.MaxQueryDepth > 0 {
+				maxDepth = apiService.serverConfig.MaxQueryDepth
+			}
+			if _, err := ParseWhere(req.Where, schema, maxDepth); err != nil {
 				return nil, err
 			}
 		}

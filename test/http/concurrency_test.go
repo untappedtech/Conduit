@@ -19,7 +19,7 @@ func TestHTTP_ConcurrentAccess(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			body := fmt.Sprintf(`{"name":"Team%d","players":%d}`, i, i+1)
-			req := httptest.NewRequest(http.MethodPost, "/v1/sports", strings.NewReader(body))
+			req := httptest.NewRequest(http.MethodPost, "/v1/data/sports", strings.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			rec := httptest.NewRecorder()
 			srv.ServeHTTP(rec, req)
@@ -27,7 +27,7 @@ func TestHTTP_ConcurrentAccess(t *testing.T) {
 	}
 	wg.Wait()
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/sports?format=json&limit=100", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/data/sports?format=json&limit=100", nil)
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
 	body := rec.Body.String()

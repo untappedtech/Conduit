@@ -31,3 +31,19 @@ func IsMalformedQuery(err error) bool {
 	_, ok := err.(*MalformedQueryError)
 	return ok
 }
+
+// QueryTooComplexError represents an error when query nesting depth exceeds the maximum allowed limit.
+type QueryTooComplexError struct {
+	Depth    int
+	MaxDepth int
+}
+
+func (e *QueryTooComplexError) Error() string {
+	return fmt.Sprintf("query too complex: nesting depth %d exceeds maximum allowed depth of %d", e.Depth, e.MaxDepth)
+}
+
+// IsQueryTooComplex returns true if the error is a QueryTooComplexError.
+func IsQueryTooComplex(err error) bool {
+	_, ok := err.(*QueryTooComplexError)
+	return ok
+}

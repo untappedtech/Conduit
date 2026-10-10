@@ -13,16 +13,18 @@ Conduit attempted to locate a database table or a specific primary key record, b
 ## Common Causes
 
 - The specified table does not exist in the database.
-- The record primary key supplied in the URL (`/v1/<table>/<id>`) does not match any existing row.
-- Mistyped URL path or incorrect base path.
+- The record primary key supplied in the URL (`/v1/data/<table>/<id>`) does not match any existing row.
+- Requesting `/docs` or `/openapi.json` when `enable_docs` is `false` in the configuration.
+- Mistyped URL path or missing the `/data/` prefix on CRUD requests.
 
 ---
 
 ## How to Fix It
 
 1. **Check Table Existence:** Query `GET /v1/schema` to list all tables recognized by Conduit.
-2. **Verify Record ID:** Confirm the record ID exists by listing records with `GET /v1/<table>?where=id = <id>`.
-3. **Verify URL Path:** Ensure your request adheres to the configured base path (e.g. `/v1/users/1` instead of `/users/1`).
+2. **Verify Record ID:** Confirm the record ID exists by listing records with `GET /v1/data/<table>?where=id = <id>`.
+3. **Verify URL Path:** Ensure your request adheres to the configured base path and `/data/` prefix (e.g. `/v1/data/users/1` instead of `/v1/users/1`).
+4. **Enable Documentation:** If `/docs` or `/openapi.json` returns 404, set `enable_docs: true` in your Conduit configuration file.
 
 ---
 
@@ -31,7 +33,7 @@ Conduit attempted to locate a database table or a specific primary key record, b
 ### Request
 
 ```http
-GET /v1/books/9999
+GET /v1/data/books/9999
 ```
 
 ### Response

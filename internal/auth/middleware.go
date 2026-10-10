@@ -31,6 +31,15 @@ func AuthMiddleware(authChain []domain.AuthProvider, tokenExtractor TokenExtract
 				if len(pathParts) > 1 {
 					tableName = pathParts[1]
 				}
+			} else if len(pathParts) > 0 && pathParts[0] == "data" {
+				if len(pathParts) > 1 {
+					tableName = pathParts[1]
+				}
+				if request.Method == http.MethodPost || request.Method == http.MethodPut || request.Method == http.MethodPatch || request.Method == http.MethodDelete {
+					targetAction = domain.ActionWriteTable
+				}
+			} else if len(pathParts) > 0 && (pathParts[0] == "openapi.json" || pathParts[0] == "docs") {
+				targetAction = domain.ActionReadTable
 			} else if len(pathParts) > 0 {
 				tableName = pathParts[0]
 				if request.Method == http.MethodPost || request.Method == http.MethodPut || request.Method == http.MethodPatch || request.Method == http.MethodDelete {

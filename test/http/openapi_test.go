@@ -6,6 +6,11 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/untappedtech/conduit/internal/db/impl"
+	"github.com/untappedtech/conduit/internal/domain"
+	httpPkg "github.com/untappedtech/conduit/internal/http"
+	"github.com/untappedtech/conduit/internal/service"
 )
 
 func TestHTTP_OpenAPI_Endpoints(t *testing.T) {
@@ -72,8 +77,8 @@ func TestHTTP_OpenAPI_DynamicSchemaMutation(t *testing.T) {
 	var specInit map[string]any
 	_ = json.Unmarshal(recInit.Body.Bytes(), &specInit)
 	pathsInit := specInit["paths"].(map[string]any)
-	if _, exists := pathsInit["/movies"]; exists {
-		t.Fatalf("table /movies should not exist in initial spec")
+	if _, exists := pathsInit["/data/movies"]; exists {
+		t.Fatalf("table /data/movies should not exist in initial spec")
 	}
 
 	// Create table 'movies' via /v1/schema/movies
@@ -99,15 +104,15 @@ func TestHTTP_OpenAPI_DynamicSchemaMutation(t *testing.T) {
 	var specAfterCreate map[string]any
 	_ = json.Unmarshal(recAfterCreate.Body.Bytes(), &specAfterCreate)
 	pathsAfterCreate := specAfterCreate["paths"].(map[string]any)
-	if _, exists := pathsAfterCreate["/movies"]; !exists {
-		t.Fatalf("expected /movies to exist in updated openapi spec")
+	if _, exists := pathsAfterCreate["/data/movies"]; !exists {
+		t.Fatalf("expected /data/movies to exist in updated openapi spec")
 	}
-	if _, exists := pathsAfterCreate["/movies/{id}"]; !exists {
-		t.Fatalf("expected /movies/{id} to exist in updated openapi spec")
+	if _, exists := pathsAfterCreate["/data/movies/{id}"]; !exists {
+		t.Fatalf("expected /data/movies/{id} to exist in updated openapi spec")
 	}
 
-	// Verify 'where' parameter is present on GET /movies
-	moviesPath := pathsAfterCreate["/movies"].(map[string]any)
+	// Verify 'where' parameter is present on GET /data/movies
+	moviesPath := pathsAfterCreate["/data/movies"].(map[string]any)
 	getOp := moviesPath["get"].(map[string]any)
 	params := getOp["parameters"].([]any)
 	hasWhere := false
@@ -119,7 +124,7 @@ func TestHTTP_OpenAPI_DynamicSchemaMutation(t *testing.T) {
 		}
 	}
 	if !hasWhere {
-		t.Fatalf("expected 'where' query parameter on GET /movies")
+		t.Fatalf("expected 'where' query parameter on GET /data/movies")
 	}
 
 	// Verify components.schemas contains 'movies' and 'moviesInput'
@@ -147,8 +152,8 @@ func TestHTTP_OpenAPI_DynamicSchemaMutation(t *testing.T) {
 	var specAfterDrop map[string]any
 	_ = json.Unmarshal(recAfterDrop.Body.Bytes(), &specAfterDrop)
 	pathsAfterDrop := specAfterDrop["paths"].(map[string]any)
-	if _, exists := pathsAfterDrop["/movies"]; exists {
-		t.Fatalf("expected /movies to be removed from openapi spec after drop")
+	if _, exists := pathsAfterDrop["/data/movies"]; exists {
+		t.Fatalf("expected /data/movies to be removed from openapi spec after drop")
 	}
 }
 
@@ -167,5 +172,31 @@ func TestHTTP_OpenAPI_MethodNotAllowed(t *testing.T) {
 	srv.ServeHTTP(recDocsPost, reqDocsPost)
 	if recDocsPost.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected 405 Method Not Allowed for POST /v1/docs, got %d", recDocsPost.Code)
+	}
+}
+
+func TestHTTP_Docs_DisabledByDefault(t *testing.T) {
+	// Setup server with default config (EnableDocs is false)
+	serverConfig := &domain.ServerConfig{}
+	serverConfig.Policy.PublicReads = true
+	memoryDB := impl.NewMemoryDB()
+	apiService := service.NewAPIService(memoryDB, serverConfig)
+	responseEncoder := httpPkg.NewResponseEncoder()
+	apiHandler := httpPkg.NewAPIHandler(apiService, serverConfig, responseEncoder)
+	serveMux := http.NewServeMux()
+	apiHandler.RegisterRoutes(serveMux)
+
+	reqOpenAPI := httptest.NewRequest(http.MethodGet, "/v1/openapi.json", nil)
+	recOpenAPI := httptest.NewRecorder()
+	serveMux.ServeHTTP(recOpenAPI, reqOpenAPI)
+	if recOpenAPI.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for /v1/openapi.json when EnableDocs=false, got %d", recOpenAPI.Code)
+	}
+
+	reqDocs := httptest.NewRequest(http.MethodGet, "/v1/docs", nil)
+	recDocs := httptest.NewRecorder()
+	serveMux.ServeHTTP(recDocs, reqDocs)
+	if recDocs.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for /v1/docs when EnableDocs=false, got %d", recDocs.Code)
 	}
 }

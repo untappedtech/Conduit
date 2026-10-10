@@ -56,10 +56,10 @@ conduit --config config.yaml
 
 ```bash
 # Read-Only Query using Bearer Token
-curl -H "Authorization: Bearer ro-dashboard-token-5678" http://localhost:8080/v1/players
+curl -H "Authorization: Bearer ro-dashboard-token-5678" http://localhost:8080/v1/data/players
 
 # Data Write using Header
-curl -X POST http://localhost:8080/v1/players \
+curl -X POST http://localhost:8080/v1/data/players \
   -H "Authorization: Bearer rw-service-token-1234" \
   -H "Content-Type: application/json" \
   -d '{"name": "Alice", "score": 90}'

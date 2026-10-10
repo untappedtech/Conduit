@@ -149,21 +149,21 @@ func TestGenerator_GenerateJSON(t *testing.T) {
 	}
 
 	// Verify Table paths exist
-	if _, ok := paths["/authors"]; !ok {
-		t.Fatalf("missing /authors path")
+	if _, ok := paths["/data/authors"]; !ok {
+		t.Fatalf("missing /data/authors path")
 	}
-	if _, ok := paths["/authors/{id}"]; !ok {
-		t.Fatalf("missing /authors/{id} path")
+	if _, ok := paths["/data/authors/{id}"]; !ok {
+		t.Fatalf("missing /data/authors/{id} path")
 	}
-	if _, ok := paths["/books"]; !ok {
-		t.Fatalf("missing /books path")
+	if _, ok := paths["/data/books"]; !ok {
+		t.Fatalf("missing /data/books path")
 	}
-	if _, ok := paths["/books/{id}"]; !ok {
-		t.Fatalf("missing /books/{id} path")
+	if _, ok := paths["/data/books/{id}"]; !ok {
+		t.Fatalf("missing /data/books/{id} path")
 	}
 
-	// Inspect /books GET parameters
-	booksPath := paths["/books"].(map[string]any)
+	// Inspect /data/books GET parameters
+	booksPath := paths["/data/books"].(map[string]any)
 	getOp := booksPath["get"].(map[string]any)
 	params := getOp["parameters"].([]any)
 

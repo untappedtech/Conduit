@@ -1,7 +1,7 @@
 package http
 
 import (
-	"fmt"
+	_ "embed"
 	"log"
 	"net/http"
 	"strconv"
@@ -12,6 +12,9 @@ import (
 	"github.com/untappedtech/conduit/internal/openapi"
 	"github.com/untappedtech/conduit/internal/service"
 )
+
+//go:embed docs.html
+var scalarDocsHTML []byte
 
 type APIHandler struct {
 	apiService       *service.APIService
@@ -67,20 +70,24 @@ func (handler *APIHandler) RegisterRoutes(serveMux *http.ServeMux, customBasePat
 	serveMux.HandleFunc(schemaPath, handler.handleSchema)
 	serveMux.HandleFunc(schemaPath+"/", handler.handleSchema)
 
-	openAPIPath := strings.TrimRight(base, "/") + "/openapi.json"
-	docsPath := strings.TrimRight(base, "/") + "/docs"
+	dataPath := strings.TrimRight(base, "/") + "/data/"
+	serveMux.HandleFunc(dataPath, handler.handleCRUD)
 
-	serveMux.HandleFunc(openAPIPath, handler.handleOpenAPI)
-	serveMux.HandleFunc(docsPath, handler.handleDocsUI)
-	serveMux.HandleFunc(docsPath+"/", handler.handleDocsUI)
+	// Conditionally mount /docs and /openapi.json only if EnableDocs is true
+	if handler.serverConfig != nil && handler.serverConfig.EnableDocs {
+		openAPIPath := strings.TrimRight(base, "/") + "/openapi.json"
+		docsPath := strings.TrimRight(base, "/") + "/docs"
 
-	if base != "/" {
-		serveMux.HandleFunc("/openapi.json", handler.handleOpenAPI)
-		serveMux.HandleFunc("/docs", handler.handleDocsUI)
-		serveMux.HandleFunc("/docs/", handler.handleDocsUI)
+		serveMux.HandleFunc(openAPIPath, handler.handleOpenAPI)
+		serveMux.HandleFunc(docsPath, handler.handleDocsUI)
+		serveMux.HandleFunc(docsPath+"/", handler.handleDocsUI)
+
+		if base != "/" {
+			serveMux.HandleFunc("/openapi.json", handler.handleOpenAPI)
+			serveMux.HandleFunc("/docs", handler.handleDocsUI)
+			serveMux.HandleFunc("/docs/", handler.handleDocsUI)
+		}
 	}
-
-	serveMux.HandleFunc(base, handler.handleCRUD)
 }
 
 func (handler *APIHandler) handleSchema(w http.ResponseWriter, r *http.Request) {
@@ -157,7 +164,8 @@ func (handler *APIHandler) handleSchema(w http.ResponseWriter, r *http.Request) 
 func (handler *APIHandler) handleCRUD(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[HTTP] %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
 
-	requestPath := strings.TrimPrefix(r.URL.Path, handler.basePath)
+	dataPath := strings.TrimRight(handler.basePath, "/") + "/data"
+	requestPath := strings.TrimPrefix(r.URL.Path, dataPath)
 	pathParts := strings.Split(strings.Trim(requestPath, "/"), "/")
 
 	if len(pathParts) == 0 || pathParts[0] == "" {
@@ -165,19 +173,9 @@ func (handler *APIHandler) handleCRUD(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if pathParts[0] == "openapi.json" {
-		handler.handleOpenAPI(w, r)
-		return
-	}
-
-	if pathParts[0] == "docs" {
-		handler.handleDocsUI(w, r)
-		return
-	}
-
 	tableName := pathParts[0]
 
-	// GET /v1/<table>
+	// GET /v1/data/<table>
 	if len(pathParts) == 1 && r.Method == http.MethodGet {
 		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
@@ -191,6 +189,10 @@ func (handler *APIHandler) handleCRUD(w http.ResponseWriter, r *http.Request) {
 
 		records, err := handler.apiService.List(r.Context(), tableName, req)
 		if err != nil {
+			if service.IsQueryTooComplex(err) {
+				handler.responseEncoder.EncodeError(w, r, errors.ErrBadRequest.With(err))
+				return
+			}
 			if service.IsInvalidColumn(err) {
 				handler.responseEncoder.EncodeError(w, r, errors.ErrBadRequest.With(err))
 				return
@@ -315,17 +317,10 @@ func (handler *APIHandler) handleDocsUI(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	specURL := strings.TrimRight(handler.basePath, "/") + "/openapi.json"
-	docTitle := "Conduit API Reference"
-	if handler.serverConfig != nil && handler.serverConfig.OpenAPI.Title != "" {
-		docTitle = fmt.Sprintf("%s Reference", handler.serverConfig.OpenAPI.Title)
-	}
-	html := openapi.DocsHTML(specURL, docTitle)
-
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	if r.Method == http.MethodHead {
 		return
 	}
-	_, _ = w.Write(html)
+	_, _ = w.Write(scalarDocsHTML)
 }

@@ -14,7 +14,7 @@ Send binary CBOR records by setting `Content-Type: application/cbor`:
 
 ```bash
 # Using a binary file or raw payload
-curl -X POST http://localhost:8080/v1/telemetry \
+curl -X POST http://localhost:8080/v1/data/telemetry \
   -H "Content-Type: application/cbor" \
   --data-binary @telemetry_payload.cbor
 ```
@@ -28,13 +28,13 @@ Conduit decodes the CBOR maps and arrays directly into schema-aligned data types
 Request CBOR responses by passing `?format=cbor` or setting `Accept: application/cbor`:
 
 ```bash
-curl http://localhost:8080/v1/telemetry?format=cbor --output response.cbor
+curl http://localhost:8080/v1/data/telemetry?format=cbor --output response.cbor
 ```
 
 Or inspect using tools like `cbor-diag` / `cbor2diag`:
 
 ```bash
-curl -s http://localhost:8080/v1/telemetry?format=cbor | cbor2diag.py
+curl -s http://localhost:8080/v1/data/telemetry?format=cbor | cbor2diag.py
 ```
 
 ### Decoded Logical Representation

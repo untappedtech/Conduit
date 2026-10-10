@@ -39,7 +39,7 @@ func insertSportsForQuery(t *testing.T, srv http.Handler) {
 	for _, s := range sports {
 		rec := httptest.NewRecorder()
 		body := `{"name":"` + s.name + `","players":` + jsonNum(s.players) + `}`
-		req := httptest.NewRequest(http.MethodPost, "/v1/sports", strings.NewReader(body))
+		req := httptest.NewRequest(http.MethodPost, "/v1/data/sports", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		srv.ServeHTTP(rec, req)
 		if rec.Code != http.StatusCreated {
@@ -59,7 +59,7 @@ func TestHTTP_Order_AscendingAndDescending(t *testing.T) {
 
 	// Test ASC
 	{
-		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/sports", "", "name:asc"), nil)
+		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/data/sports", "", "name:asc"), nil)
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
@@ -87,7 +87,7 @@ func TestHTTP_Order_AscendingAndDescending(t *testing.T) {
 
 	// Test DESC
 	{
-		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/sports", "", "name:desc"), nil)
+		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/data/sports", "", "name:desc"), nil)
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
@@ -110,7 +110,7 @@ func TestHTTP_Order_AscendingAndDescending(t *testing.T) {
 
 	// Test Numeric DESC
 	{
-		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/sports", "", "players:desc"), nil)
+		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/data/sports", "", "players:desc"), nil)
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
@@ -139,7 +139,7 @@ func TestHTTP_Where_Filters(t *testing.T) {
 
 	// Filter: players > 5
 	{
-		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/sports", "players > 5", ""), nil)
+		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/data/sports", "players > 5", ""), nil)
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
@@ -165,7 +165,7 @@ func TestHTTP_Where_Filters(t *testing.T) {
 
 	// Filter: name = 'Golf'
 	{
-		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/sports", "name = 'Golf'", ""), nil)
+		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/data/sports", "name = 'Golf'", ""), nil)
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
@@ -185,7 +185,7 @@ func TestHTTP_Where_Filters(t *testing.T) {
 
 	// Filter: name LIKE '%ball%'
 	{
-		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/sports", "name LIKE '%ball%'", ""), nil)
+		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/data/sports", "name LIKE '%ball%'", ""), nil)
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
@@ -205,7 +205,7 @@ func TestHTTP_Where_Filters(t *testing.T) {
 
 	// Filter: name IN ('Tennis', 'Soccer')
 	{
-		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/sports", "name IN ('Tennis', 'Soccer')", ""), nil)
+		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/data/sports", "name IN ('Tennis', 'Soccer')", ""), nil)
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
@@ -225,7 +225,7 @@ func TestHTTP_Where_Filters(t *testing.T) {
 
 	// Combined: where AND order
 	{
-		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/sports", "players >= 2", "players:desc"), nil)
+		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/data/sports", "players >= 2", "players:desc"), nil)
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
@@ -257,7 +257,7 @@ func TestHTTP_OrderAndWhere_ErrorValidation(t *testing.T) {
 
 	// Invalid column in order -> 400 Bad Request
 	{
-		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/sports", "", "non_existent_col:asc"), nil)
+		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/data/sports", "", "non_existent_col:asc"), nil)
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
 		if rec.Code != http.StatusBadRequest {
@@ -267,7 +267,7 @@ func TestHTTP_OrderAndWhere_ErrorValidation(t *testing.T) {
 
 	// Invalid direction in order -> 422 Unprocessable Entity
 	{
-		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/sports", "", "name:backwards"), nil)
+		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/data/sports", "", "name:backwards"), nil)
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
 		if rec.Code != http.StatusUnprocessableEntity {
@@ -277,7 +277,7 @@ func TestHTTP_OrderAndWhere_ErrorValidation(t *testing.T) {
 
 	// Invalid column in where -> 400 Bad Request
 	{
-		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/sports", "non_existent > 10", ""), nil)
+		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/data/sports", "non_existent > 10", ""), nil)
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
 		if rec.Code != http.StatusBadRequest {
@@ -287,7 +287,7 @@ func TestHTTP_OrderAndWhere_ErrorValidation(t *testing.T) {
 
 	// Malformed syntax in where -> 422 Unprocessable Entity
 	{
-		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/sports", "players >", ""), nil)
+		req := httptest.NewRequest(http.MethodGet, queryURL("/v1/data/sports", "players >", ""), nil)
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
 		if rec.Code != http.StatusUnprocessableEntity {

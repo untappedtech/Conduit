@@ -15,7 +15,7 @@ To stream records into Conduit, set `Content-Type: application/x-ndjson`:
 ### Ingesting Multiple Records (POST)
 
 ```bash
-curl -X POST http://localhost:8080/v1/metrics \
+curl -X POST http://localhost:8080/v1/data/metrics \
   -H "Content-Type: application/x-ndjson" \
   -d '{"sensor_id": "temp-01", "value": 21.4, "timestamp": "2026-10-08T12:00:00Z"}
 {"sensor_id": "temp-02", "value": 22.8, "timestamp": "2026-10-08T12:00:00Z"}
@@ -31,7 +31,7 @@ Conduit iterates through the stream line-by-line, parsing and inserting each obj
 Request NDJSON responses with `?format=ndjson` or `Accept: application/x-ndjson`:
 
 ```bash
-curl http://localhost:8080/v1/metrics?format=ndjson
+curl http://localhost:8080/v1/data/metrics?format=ndjson
 ```
 
 ### Response Example

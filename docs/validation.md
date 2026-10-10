@@ -4,9 +4,9 @@ Conduit uses table schema metadata as the authoritative validator for all incomi
 
 Validation occurs automatically prior to generating or executing SQL for:
 
-- `POST /v1/<table>` (Insert)
-- `PUT /v1/<table>/<id>` (Replace)
-- `PATCH /v1/<table>/<id>` (Update)
+- `POST /v1/data/<table>` (Insert)
+- `PUT /v1/data/<table>/<id>` (Replace)
+- `PATCH /v1/data/<table>/<id>` (Update)
 
 ---
 

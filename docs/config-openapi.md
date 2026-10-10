@@ -51,9 +51,12 @@ openapi:
 
 ## Interactive Documentation UI
 
-Conduit includes an embedded interactive API reference powered by [Scalar](https://scalar.com).
+Conduit includes an embedded interactive API reference powered by [Scalar](https://scalar.com) loaded via CDN in a minimal embedded HTML shell.
 
-Whenever Conduit is running, the interactive documentation is accessible in your web browser at:
+> [!NOTE]
+> Mounting `/docs` and `/openapi.json` requires setting `enable_docs: true` at the root of your Conduit configuration file (default is `false`).
+
+When `enable_docs: true` is configured, the interactive documentation is accessible in your web browser at:
 
 ```
 http://localhost:8080/v1/docs
@@ -61,13 +64,13 @@ http://localhost:8080/v1/docs
 
 Root fallback aliases are also registered at `http://localhost:8080/docs`.
 
-The browser interface renders an interactive sandbox where developers can browse all discovered database tables, inspect columns and data types, test query parameters, and execute live API requests.
+The browser interface renders an interactive sandbox where developers can browse all discovered database tables, inspect columns and data types, test query parameters, and execute live API requests against the `/v1/data/<table>` endpoints.
 
 ---
 
 ## OpenAPI Spec Endpoint
 
-The raw OpenAPI 3.0.3 specification is served at:
+When `enable_docs: true` is configured, the raw OpenAPI 3.0.3 specification is served at:
 
 ```
 GET /v1/openapi.json

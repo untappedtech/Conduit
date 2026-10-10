@@ -12,6 +12,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type ServerConfig = domain.ServerConfig
+type RateLimitConfig = domain.RateLimitConfig
+
 func Load(customConfigPath string) (*domain.ServerConfig, error) {
 	if customConfigPath != "" {
 		return loadConfigFile(customConfigPath)
@@ -74,10 +77,25 @@ func loadConfigFile(filePath string) (*domain.ServerConfig, error) {
 		return nil, fmt.Errorf("failed to parse config %s: %w", filePath, err)
 	}
 
+	if strings.HasSuffix(lowerFilePath, ".json") && serverConfig.OpenAPI.TermsOfService == "" {
+		var rawMap struct {
+			OpenAPI struct {
+				TermsOfService string `json:"termsOfService"`
+			} `json:"openapi"`
+		}
+		if json.Unmarshal(fileData, &rawMap) == nil && rawMap.OpenAPI.TermsOfService != "" {
+			serverConfig.OpenAPI.TermsOfService = rawMap.OpenAPI.TermsOfService
+		}
+	}
+
 	if serverConfig.Server.DefaultLimit < 0 {
 		serverConfig.Server.DefaultLimit = 50
 	}
 	serverConfig.Server.BasePath = normalizeBasePath(serverConfig.Server.BasePath)
+
+	if serverConfig.MaxQueryDepth <= 0 {
+		serverConfig.MaxQueryDepth = 5
+	}
 
 	if serverConfig.OpenAPI.Title == "" {
 		serverConfig.OpenAPI.Title = "Conduit API"
@@ -98,6 +116,11 @@ func GenerateDefaultConfig(formatType string, outputFilePath string) error {
 	defaultConfig.Server.Port = 8080
 	defaultConfig.Server.BasePath = "/v1/"
 	defaultConfig.Server.DefaultLimit = 50
+	defaultConfig.MaxQueryDepth = 5
+
+	defaultConfig.RateLimit.Enabled = false
+	defaultConfig.RateLimit.RequestsPerSecond = 100
+	defaultConfig.RateLimit.Burst = 200
 
 	defaultConfig.Database.Driver = "sqlite"
 	defaultConfig.Database.DSN = "./app.db?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"

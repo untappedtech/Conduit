@@ -11,7 +11,7 @@ func TestHTTP_InsertUpdateDeleteLifecycle_JSON(t *testing.T) {
 	srv := setupTestHTTPServer()
 	createSportsSchema(t, srv)
 
-	insertReq := httptest.NewRequest(http.MethodPost, "/v1/sports", strings.NewReader(`{"name":"Tennis","players":2}`))
+	insertReq := httptest.NewRequest(http.MethodPost, "/v1/data/sports", strings.NewReader(`{"name":"Tennis","players":2}`))
 	insertReq.Header.Set("Content-Type", "application/json")
 	insertRec := httptest.NewRecorder()
 	srv.ServeHTTP(insertRec, insertReq)
@@ -19,7 +19,7 @@ func TestHTTP_InsertUpdateDeleteLifecycle_JSON(t *testing.T) {
 		t.Fatalf("insert failed: %d, body=%s", insertRec.Code, insertRec.Body.String())
 	}
 
-	updateReq := httptest.NewRequest(http.MethodPut, "/v1/sports/1", strings.NewReader(`{"name":"Tennis","players":4}`))
+	updateReq := httptest.NewRequest(http.MethodPut, "/v1/data/sports/1", strings.NewReader(`{"name":"Tennis","players":4}`))
 	updateReq.Header.Set("Content-Type", "application/json")
 	updateRec := httptest.NewRecorder()
 	srv.ServeHTTP(updateRec, updateReq)
@@ -30,14 +30,14 @@ func TestHTTP_InsertUpdateDeleteLifecycle_JSON(t *testing.T) {
 		t.Fatalf("expected updated players=4, got:\n%s", updateRec.Body.String())
 	}
 
-	deleteReq := httptest.NewRequest(http.MethodDelete, "/v1/sports/1", nil)
+	deleteReq := httptest.NewRequest(http.MethodDelete, "/v1/data/sports/1", nil)
 	deleteRec := httptest.NewRecorder()
 	srv.ServeHTTP(deleteRec, deleteReq)
 	if deleteRec.Code != http.StatusNoContent {
 		t.Fatalf("delete failed: %d, body=%s", deleteRec.Code, deleteRec.Body.String())
 	}
 
-	getReq := httptest.NewRequest(http.MethodGet, "/v1/sports/1?format=json", nil)
+	getReq := httptest.NewRequest(http.MethodGet, "/v1/data/sports/1?format=json", nil)
 	getRec := httptest.NewRecorder()
 	srv.ServeHTTP(getRec, getReq)
 	if getRec.Code != http.StatusNotFound {
@@ -49,7 +49,7 @@ func TestHTTP_RoundTrip_JSON(t *testing.T) {
 	srv := setupTestHTTPServer()
 	createSportsSchema(t, srv)
 
-	insertReq := httptest.NewRequest(http.MethodPost, "/v1/sports", strings.NewReader(`{"name":"RoundTrip","players":3}`))
+	insertReq := httptest.NewRequest(http.MethodPost, "/v1/data/sports", strings.NewReader(`{"name":"RoundTrip","players":3}`))
 	insertReq.Header.Set("Content-Type", "application/json")
 	insertRec := httptest.NewRecorder()
 	srv.ServeHTTP(insertRec, insertReq)
@@ -57,7 +57,7 @@ func TestHTTP_RoundTrip_JSON(t *testing.T) {
 		t.Fatalf("insert failed: %d", insertRec.Code)
 	}
 
-	getReq := httptest.NewRequest(http.MethodGet, "/v1/sports/1?format=json", nil)
+	getReq := httptest.NewRequest(http.MethodGet, "/v1/data/sports/1?format=json", nil)
 	getRec := httptest.NewRecorder()
 	srv.ServeHTTP(getRec, getReq)
 	body := getRec.Body.String()
@@ -65,7 +65,7 @@ func TestHTTP_RoundTrip_JSON(t *testing.T) {
 		t.Fatalf("expected RoundTrip in JSON, got:\n%s", body)
 	}
 
-	updateReq := httptest.NewRequest(http.MethodPut, "/v1/sports/1", strings.NewReader(`{"name":"RoundTrip2","players":5}`))
+	updateReq := httptest.NewRequest(http.MethodPut, "/v1/data/sports/1", strings.NewReader(`{"name":"RoundTrip2","players":5}`))
 	updateReq.Header.Set("Content-Type", "application/json")
 	updateRec := httptest.NewRecorder()
 	srv.ServeHTTP(updateRec, updateReq)
@@ -73,7 +73,7 @@ func TestHTTP_RoundTrip_JSON(t *testing.T) {
 		t.Fatalf("update failed: %d", updateRec.Code)
 	}
 
-	getReq2 := httptest.NewRequest(http.MethodGet, "/v1/sports/1?format=json", nil)
+	getReq2 := httptest.NewRequest(http.MethodGet, "/v1/data/sports/1?format=json", nil)
 	getRec2 := httptest.NewRecorder()
 	srv.ServeHTTP(getRec2, getReq2)
 	body2 := getRec2.Body.String()
@@ -86,7 +86,7 @@ func TestHTTP_MalformedPayloads(t *testing.T) {
 	srv := setupTestHTTPServer()
 	createSportsSchema(t, srv)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/sports", strings.NewReader(`{"name":`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/data/sports", strings.NewReader(`{"name":`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
@@ -99,7 +99,7 @@ func TestHTTP_PatchPartialUpdate_JSON(t *testing.T) {
 	srv := setupTestHTTPServer()
 	createSportsSchema(t, srv)
 
-	insertReq := httptest.NewRequest(http.MethodPost, "/v1/sports", strings.NewReader(`{"name":"Tennis","players":2}`))
+	insertReq := httptest.NewRequest(http.MethodPost, "/v1/data/sports", strings.NewReader(`{"name":"Tennis","players":2}`))
 	insertReq.Header.Set("Content-Type", "application/json")
 	insertRec := httptest.NewRecorder()
 	srv.ServeHTTP(insertRec, insertReq)
@@ -107,7 +107,7 @@ func TestHTTP_PatchPartialUpdate_JSON(t *testing.T) {
 		t.Fatalf("insert failed: %d, body=%s", insertRec.Code, insertRec.Body.String())
 	}
 
-	patchReq := httptest.NewRequest(http.MethodPatch, "/v1/sports/1", strings.NewReader(`{"players":4}`))
+	patchReq := httptest.NewRequest(http.MethodPatch, "/v1/data/sports/1", strings.NewReader(`{"players":4}`))
 	patchReq.Header.Set("Content-Type", "application/json")
 	patchRec := httptest.NewRecorder()
 	srv.ServeHTTP(patchRec, patchReq)

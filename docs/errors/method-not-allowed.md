@@ -12,7 +12,7 @@ Conduit recognized the target endpoint path, but the HTTP verb (`GET`, `POST`, `
 
 ## Common Causes
 
-- Sending a `PUT` or `PATCH` request to a collection endpoint (`/v1/<table>`) instead of a single record endpoint (`/v1/<table>/<id>`).
+- Sending a `PUT` or `PATCH` request to a collection endpoint (`/v1/data/<table>`) instead of a single record endpoint (`/v1/data/<table>/<id>`).
 - Sending `DELETE` or `PUT` to `/v1/schema` without specifying a table name.
 - Using unsupported methods such as `TRACE` or `CONNECT`.
 
@@ -21,8 +21,8 @@ Conduit recognized the target endpoint path, but the HTTP verb (`GET`, `POST`, `
 ## How to Fix It
 
 1. **Verify Allowed Methods:**
-   - Collection endpoint `/v1/<table>`: Supports `GET` and `POST`.
-   - Record endpoint `/v1/<table>/<id>`: Supports `GET`, `PUT`, `PATCH`, and `DELETE`.
+   - Collection endpoint `/v1/data/<table>`: Supports `GET` and `POST`.
+   - Record endpoint `/v1/data/<table>/<id>`: Supports `GET`, `PUT`, `PATCH`, and `DELETE`.
    - Schema catalog `/v1/schema`: Supports `GET`.
    - Table schema `/v1/schema/<table>`: Supports `GET`, `POST`, and `DELETE`.
 2. **Review API Documentation:** Check the [CRUD API](crud-api.md) and [Schema API](schema-api.md) references.
@@ -33,7 +33,7 @@ Conduit recognized the target endpoint path, but the HTTP verb (`GET`, `POST`, `
 
 ### Request
 ```http
-PUT /v1/books
+PUT /v1/data/books
 Content-Type: application/json
 
 {"title": "Updated Title"}
@@ -45,9 +45,9 @@ Content-Type: application/json
   "error": {
     "status": 405,
     "title": "Method Not Allowed",
-    "message": "The HTTP method 'PUT' is not allowed on collection endpoint '/v1/books'.",
+    "message": "The HTTP method 'PUT' is not allowed on collection endpoint '/v1/data/books'.",
     "details": [
-      "Use PUT on /v1/books/<id> to replace an individual record"
+      "Use PUT on /v1/data/books/<id> to replace an individual record"
     ],
     "documentation": "https://conduit.untapped.tech/docs/errors/method-not-allowed"
   }

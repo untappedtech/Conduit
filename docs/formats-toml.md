@@ -15,7 +15,7 @@ Set `Content-Type: application/toml`:
 ### Create Single Record (POST)
 
 ```bash
-curl -X POST http://localhost:8080/v1/projects \
+curl -X POST http://localhost:8080/v1/data/projects \
   -H "Content-Type: application/toml" \
   -d '
 name = "Apollo"
@@ -30,7 +30,7 @@ active = true
 Using TOML array of tables:
 
 ```bash
-curl -X POST http://localhost:8080/v1/projects \
+curl -X POST http://localhost:8080/v1/data/projects \
   -H "Content-Type: application/toml" \
   -d '
 [[projects]]
@@ -52,7 +52,7 @@ lead = "Alan Shepard"
 Request TOML output with `?format=toml` or `Accept: application/toml`:
 
 ```bash
-curl http://localhost:8080/v1/projects?format=toml
+curl http://localhost:8080/v1/data/projects?format=toml
 ```
 
 ### List Response

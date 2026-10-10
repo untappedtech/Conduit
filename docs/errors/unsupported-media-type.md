@@ -44,7 +44,7 @@ Conduit supports incoming request bodies in the following formats:
 ### Request
 
 ```http
-POST /v1/books
+POST /v1/data/books
 Content-Type: application/zip
 
 [binary data]

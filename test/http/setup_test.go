@@ -16,6 +16,7 @@ import (
 func setupTestHTTPServerWithLimit(defaultLimit int) http.Handler {
 	serverConfig := &domain.ServerConfig{}
 	serverConfig.Server.DefaultLimit = defaultLimit
+	serverConfig.EnableDocs = true
 	serverConfig.Policy.PublicReads = true
 	serverConfig.Policy.PublicWrites = true
 	serverConfig.Policy.PublicMutation = true
@@ -60,7 +61,7 @@ func insertSportsRecords(t *testing.T, srv http.Handler) {
 		`{"name":"Golf","players":4,"created_at":"2026-08-11 17:57:30"}`,
 		`{"name":"Soccer","players":11,"created_at":"2026-08-11 17:57:30"}`,
 	} {
-		req := httptest.NewRequest(http.MethodPost, "/v1/sports", strings.NewReader(body))
+		req := httptest.NewRequest(http.MethodPost, "/v1/data/sports", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)

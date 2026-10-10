@@ -53,7 +53,7 @@ Complex SQL-like `where` filter expressions are processed in two stages (`intern
 When a client submits a filter such as:
 
 ```
-GET /v1/books?where=(rating >= 4.5 OR featured = true) AND archived = false
+GET /v1/data/books?where=(rating >= 4.5 OR featured = true) AND archived = false
 ```
 
 The expression string is combined with table column definitions and hashed using [xxHash](https://github.com/cespare/xxhash). If an AST already exists in the 1024-entry AST LRU cache, lexing and parsing are bypassed entirely.

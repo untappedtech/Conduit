@@ -15,7 +15,7 @@ To import CSV records directly into a table, set `Content-Type: text/csv`. The f
 ### Bulk Insert (POST)
 
 ```bash
-curl -X POST http://localhost:8080/v1/employees \
+curl -X POST http://localhost:8080/v1/data/employees \
   -H "Content-Type: text/csv" \
   -d 'name,department,salary
 Alice Johnson,Engineering,115000
@@ -32,13 +32,13 @@ Conduit parses header rows, casts field values to the underlying database column
 Export table rows directly as CSV using `?format=csv` or `Accept: text/csv`:
 
 ```bash
-curl http://localhost:8080/v1/employees?format=csv
+curl http://localhost:8080/v1/data/employees?format=csv
 ```
 
 ### Export Filtered & Sorted Data
 
 ```bash
-curl "http://localhost:8080/v1/employees?where=salary%20%3E%3D%20100000&order=salary:desc&format=csv"
+curl "http://localhost:8080/v1/data/employees?where=salary%20%3E%3D%20100000&order=salary:desc&format=csv"
 ```
 
 ### Response Example

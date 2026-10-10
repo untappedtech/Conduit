@@ -74,8 +74,8 @@ func TestConfigurableBasePath_Custom(t *testing.T) {
 		t.Fatalf("expected response to contain 'items', got %s", rec.Body.String())
 	}
 
-	// 3. Insert record on /api/v2/items
-	req = httptest.NewRequest(http.MethodPost, "/api/v2/items", strings.NewReader(`{"title": "Item 1"}`))
+	// 3. Insert record on /api/v2/data/items
+	req = httptest.NewRequest(http.MethodPost, "/api/v2/data/items", strings.NewReader(`{"title": "Item 1"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec = httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
@@ -83,8 +83,8 @@ func TestConfigurableBasePath_Custom(t *testing.T) {
 		t.Fatalf("insert failed with code %d: %s", rec.Code, rec.Body.String())
 	}
 
-	// 4. Query record on /api/v2/items
-	req = httptest.NewRequest(http.MethodGet, "/api/v2/items", nil)
+	// 4. Query record on /api/v2/data/items
+	req = httptest.NewRequest(http.MethodGet, "/api/v2/data/items", nil)
 	rec = httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -94,8 +94,8 @@ func TestConfigurableBasePath_Custom(t *testing.T) {
 		t.Fatalf("expected 'Item 1' in response, got %s", rec.Body.String())
 	}
 
-	// 5. Query /v1/items should 404 because BasePath is /api/v2/
-	req = httptest.NewRequest(http.MethodGet, "/v1/items", nil)
+	// 5. Query /v1/data/items should 404 because BasePath is /api/v2/
+	req = httptest.NewRequest(http.MethodGet, "/v1/data/items", nil)
 	rec = httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNotFound {

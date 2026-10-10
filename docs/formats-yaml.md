@@ -15,7 +15,7 @@ To send YAML payloads to Conduit, set `Content-Type: application/x-yaml`:
 ### Create Single Record (POST)
 
 ```bash
-curl -X POST http://localhost:8080/v1/servers \
+curl -X POST http://localhost:8080/v1/data/servers \
   -H "Content-Type: application/x-yaml" \
   -d '
 hostname: prod-web-01
@@ -28,7 +28,7 @@ active: true
 ### Batch Insertion (POST)
 
 ```bash
-curl -X POST http://localhost:8080/v1/servers \
+curl -X POST http://localhost:8080/v1/data/servers \
   -H "Content-Type: application/x-yaml" \
   -d '
 - hostname: prod-db-01
@@ -49,7 +49,7 @@ curl -X POST http://localhost:8080/v1/servers \
 Request YAML formatting using `?format=yaml` or the `Accept: application/x-yaml` header:
 
 ```bash
-curl http://localhost:8080/v1/servers?format=yaml
+curl http://localhost:8080/v1/data/servers?format=yaml
 ```
 
 ### List Response

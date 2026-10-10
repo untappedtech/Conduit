@@ -15,7 +15,7 @@ To send JSON data to Conduit, set the `Content-Type: application/json` header:
 ### Create Record (POST)
 
 ```bash
-curl -X POST http://localhost:8080/v1/books \
+curl -X POST http://localhost:8080/v1/data/books \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Dune",
@@ -30,7 +30,7 @@ curl -X POST http://localhost:8080/v1/books \
 Conduit accepts an array of objects for bulk insertion:
 
 ```bash
-curl -X POST http://localhost:8080/v1/books \
+curl -X POST http://localhost:8080/v1/data/books \
   -H "Content-Type: application/json" \
   -d '[
     { "title": "Neuromancer", "author": "William Gibson", "published_year": 1984 },
@@ -45,13 +45,13 @@ curl -X POST http://localhost:8080/v1/books \
 JSON is the default response format. You can also explicitly request JSON:
 
 ```bash
-curl http://localhost:8080/v1/books?format=json
+curl http://localhost:8080/v1/data/books?format=json
 ```
 
 Or using headers:
 
 ```bash
-curl -H "Accept: application/json" http://localhost:8080/v1/books
+curl -H "Accept: application/json" http://localhost:8080/v1/data/books
 ```
 
 ### Single Record Response

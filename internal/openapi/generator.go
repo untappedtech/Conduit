@@ -468,8 +468,8 @@ func (g *Generator) registerTablePaths(spec *OpenAPI, tableName string, columns 
 		},
 	}
 
-	// Path: /{table}
-	tablePath := "/" + tableName
+	// Path: /data/{table}
+	tablePath := "/data/" + tableName
 	spec.Paths[tablePath] = PathItem{
 		Get: &Operation{
 			Tags:        []string{tableName},
@@ -553,9 +553,9 @@ func (g *Generator) registerTablePaths(spec *OpenAPI, tableName string, columns 
 		}
 	}
 
-	// If table has exactly one PK column, expose /{table}/{id}
+	// If table has exactly one PK column, expose /data/{table}/{id}
 	if pkCount == 1 && pkCol != nil {
-		idPath := fmt.Sprintf("/%s/{id}", tableName)
+		idPath := fmt.Sprintf("/data/%s/{id}", tableName)
 		idParamSchema := SQLTypeToSchema(*pkCol)
 		idParamSchema.ReadOnly = nil
 		idParamSchema.Nullable = nil
