@@ -185,8 +185,8 @@ func (engine *SQLServerEngine) CreateTable(ctx context.Context, tableName string
 			CREATE TABLE %s (%s);
 		END;
 		`,
-		engine.QuoteIdent(tableName),         // OBJECT_ID lookup
-		engine.QuoteIdent(tableName),         // CREATE TABLE name
+		engine.QuoteIdent(tableName),           // OBJECT_ID lookup
+		engine.QuoteIdent(tableName),           // CREATE TABLE name
 		strings.Join(columnDeclarations, ", "), // column definitions
 	)
 

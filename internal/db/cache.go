@@ -161,4 +161,3 @@ func (cachedDB *CachedDatabase) Invalidate() {
 func (cachedDB *CachedDatabase) QueryCache() *QueryCache {
 	return cachedDB.queryCache
 }
-

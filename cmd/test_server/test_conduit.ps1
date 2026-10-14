@@ -192,6 +192,7 @@ function Assert-Test {
 # ------------------------------------------------------------------------------
 
 $base = "$BaseUrl/v1"
+$data = "$base/data"
 $root = $BaseUrl.TrimEnd('/')
 
 Write-Banner 'Conduit Full Live Integration Test Suite'
@@ -202,7 +203,7 @@ $health = Invoke-ConduitRequest -Method 'GET' -Url "$base/schema"
 if (-not $health.Success -or $health.StatusCode -eq 0) {
     Write-Host "`n[ERROR] Unable to connect to Conduit at $BaseUrl." -ForegroundColor Red
     Write-Host 'Please start the Conduit server before executing this test script:' -ForegroundColor Yellow
-    Write-Host '  go run ./cmd/server' -ForegroundColor White
+    Write-Host '  go run ./cmd/conduit' -ForegroundColor White
     Write-Host '  OR: .\conduit.exe' -ForegroundColor White
     exit 1
 }
@@ -384,28 +385,28 @@ Write-Section '4. CRUD Operations in EACH Format'
 
 # 4.1 JSON CRUD (Table: test_json)
 Write-Host "`n  -> Testing JSON CRUD" -ForegroundColor Magenta
-$r = Invoke-ConduitRequest -Method 'POST' -Url "$base/test_json" -Body '{"name":"Alice","score":95,"active":true}' -ContentType 'application/json'
+$r = Invoke-ConduitRequest -Method 'POST' -Url "$data/test_json" -Body '{"name":"Alice","score":95,"active":true}' -ContentType 'application/json'
 Assert-Test -TestName 'JSON CRUD: POST record 1' -Response $r -ExpectedStatus 201 -ExpectedContentType 'application/json' -ExpectedSubstrings @('"name": "Alice"')
 
-$r = Invoke-ConduitRequest -Method 'POST' -Url "$base/test_json" -Body '{"name":"Bob","score":80,"active":false}' -ContentType 'application/json'
+$r = Invoke-ConduitRequest -Method 'POST' -Url "$data/test_json" -Body '{"name":"Bob","score":80,"active":false}' -ContentType 'application/json'
 Assert-Test -TestName 'JSON CRUD: POST record 2' -Response $r -ExpectedStatus 201
 
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_json?format=json"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_json?format=json"
 Assert-Test -TestName 'JSON CRUD: GET collection' -Response $r -ExpectedStatus 200 -ExpectedContentType 'application/json' -ExpectedSubstrings @('Alice', 'Bob')
 
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_json/1?format=json"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_json/1?format=json"
 Assert-Test -TestName 'JSON CRUD: GET record 1' -Response $r -ExpectedStatus 200 -ExpectedContentType 'application/json' -ExpectedSubstrings @('"name": "Alice"')
 
-$r = Invoke-ConduitRequest -Method 'PUT' -Url "$base/test_json/1" -Body '{"name":"Alice M","score":99,"active":true}' -ContentType 'application/json'
+$r = Invoke-ConduitRequest -Method 'PUT' -Url "$data/test_json/1" -Body '{"name":"Alice M","score":99,"active":true}' -ContentType 'application/json'
 Assert-Test -TestName 'JSON CRUD: PUT record 1' -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('"name": "Alice M"', '"score": 99')
 
-$r = Invoke-ConduitRequest -Method 'PATCH' -Url "$base/test_json/1" -Body '{"score":100}' -ContentType 'application/json'
+$r = Invoke-ConduitRequest -Method 'PATCH' -Url "$data/test_json/1" -Body '{"score":100}' -ContentType 'application/json'
 Assert-Test -TestName 'JSON CRUD: PATCH record 1' -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('"score": 100')
 
-$r = Invoke-ConduitRequest -Method 'DELETE' -Url "$base/test_json/2"
+$r = Invoke-ConduitRequest -Method 'DELETE' -Url "$data/test_json/2"
 Assert-Test -TestName 'JSON CRUD: DELETE record 2' -Response $r -ExpectedStatus 204
 
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_json/2?format=json"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_json/2?format=json"
 Assert-Test -TestName 'JSON CRUD: Verify deleted record 2 is 404' -Response $r -ExpectedStatus 404
 
 # 4.2 YAML CRUD (Table: test_yaml)
@@ -415,13 +416,13 @@ name: Charlie
 score: 85
 active: true
 '@
-$r = Invoke-ConduitRequest -Method 'POST' -Url "$base/test_yaml" -Body $yamlInsert -ContentType 'application/x-yaml'
+$r = Invoke-ConduitRequest -Method 'POST' -Url "$data/test_yaml" -Body $yamlInsert -ContentType 'application/x-yaml'
 Assert-Test -TestName 'YAML CRUD: POST record' -Response $r -ExpectedStatus 201 -ExpectedContentType 'yaml' -ExpectedSubstrings @('name: Charlie')
 
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_yaml?format=yaml"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_yaml?format=yaml"
 Assert-Test -TestName 'YAML CRUD: GET collection' -Response $r -ExpectedStatus 200 -ExpectedContentType 'yaml' -ExpectedSubstrings @('test_yaml:', 'name: Charlie')
 
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_yaml/1?format=yaml"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_yaml/1?format=yaml"
 Assert-Test -TestName 'YAML CRUD: GET record 1' -Response $r -ExpectedStatus 200 -ExpectedContentType 'yaml' -ExpectedSubstrings @('name: Charlie')
 
 $yamlUpdate = @'
@@ -429,16 +430,16 @@ name: Charlie M
 score: 88
 active: true
 '@
-$r = Invoke-ConduitRequest -Method 'PUT' -Url "$base/test_yaml/1" -Body $yamlUpdate -ContentType 'application/x-yaml'
+$r = Invoke-ConduitRequest -Method 'PUT' -Url "$data/test_yaml/1" -Body $yamlUpdate -ContentType 'application/x-yaml'
 Assert-Test -TestName 'YAML CRUD: PUT record 1' -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('name: Charlie M')
 
 $yamlPatch = @'
 score: 92
 '@
-$r = Invoke-ConduitRequest -Method 'PATCH' -Url "$base/test_yaml/1" -Body $yamlPatch -ContentType 'application/x-yaml'
+$r = Invoke-ConduitRequest -Method 'PATCH' -Url "$data/test_yaml/1" -Body $yamlPatch -ContentType 'application/x-yaml'
 Assert-Test -TestName 'YAML CRUD: PATCH record 1' -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('score: 92')
 
-$r = Invoke-ConduitRequest -Method 'DELETE' -Url "$base/test_yaml/1"
+$r = Invoke-ConduitRequest -Method 'DELETE' -Url "$data/test_yaml/1"
 Assert-Test -TestName 'YAML CRUD: DELETE record 1' -Response $r -ExpectedStatus 204
 
 # 4.3 TOML CRUD (Table: test_toml)
@@ -448,13 +449,13 @@ name = "Dave"
 score = 75
 active = true
 '@
-$r = Invoke-ConduitRequest -Method 'POST' -Url "$base/test_toml" -Body $tomlInsert -ContentType 'application/toml'
+$r = Invoke-ConduitRequest -Method 'POST' -Url "$data/test_toml" -Body $tomlInsert -ContentType 'application/toml'
 Assert-Test -TestName 'TOML CRUD: POST record' -Response $r -ExpectedStatus 201 -ExpectedContentType 'toml' -ExpectedSubstrings @('name = "Dave"')
 
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_toml?format=toml"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_toml?format=toml"
 Assert-Test -TestName 'TOML CRUD: GET collection' -Response $r -ExpectedStatus 200 -ExpectedContentType 'toml' -ExpectedSubstrings @('[[test_toml]]', 'name = "Dave"')
 
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_toml/1?format=toml"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_toml/1?format=toml"
 Assert-Test -TestName 'TOML CRUD: GET record 1' -Response $r -ExpectedStatus 200 -ExpectedContentType 'toml' -ExpectedSubstrings @('[test_toml]', 'name = "Dave"')
 
 $tomlUpdate = @'
@@ -462,16 +463,16 @@ name = "Dave M"
 score = 78
 active = true
 '@
-$r = Invoke-ConduitRequest -Method 'PUT' -Url "$base/test_toml/1" -Body $tomlUpdate -ContentType 'application/toml'
+$r = Invoke-ConduitRequest -Method 'PUT' -Url "$data/test_toml/1" -Body $tomlUpdate -ContentType 'application/toml'
 Assert-Test -TestName 'TOML CRUD: PUT record 1' -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('name = "Dave M"')
 
 $tomlPatch = @'
 score = 82
 '@
-$r = Invoke-ConduitRequest -Method 'PATCH' -Url "$base/test_toml/1" -Body $tomlPatch -ContentType 'application/toml'
+$r = Invoke-ConduitRequest -Method 'PATCH' -Url "$data/test_toml/1" -Body $tomlPatch -ContentType 'application/toml'
 Assert-Test -TestName 'TOML CRUD: PATCH record 1' -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('score = 82')
 
-$r = Invoke-ConduitRequest -Method 'DELETE' -Url "$base/test_toml/1"
+$r = Invoke-ConduitRequest -Method 'DELETE' -Url "$data/test_toml/1"
 Assert-Test -TestName 'TOML CRUD: DELETE record 1' -Response $r -ExpectedStatus 204
 
 # 4.4 XML CRUD (Table: test_xml)
@@ -483,13 +484,13 @@ $xmlInsert = @'
   <active>true</active>
 </item>
 '@
-$r = Invoke-ConduitRequest -Method 'POST' -Url "$base/test_xml" -Body $xmlInsert -ContentType 'application/xml'
+$r = Invoke-ConduitRequest -Method 'POST' -Url "$data/test_xml" -Body $xmlInsert -ContentType 'application/xml'
 Assert-Test -TestName 'XML CRUD: POST record' -Response $r -ExpectedStatus 201 -ExpectedContentType 'xml' -ExpectedSubstrings @('<name>Eve</name>')
 
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_xml?format=xml"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_xml?format=xml"
 Assert-Test -TestName 'XML CRUD: GET collection' -Response $r -ExpectedStatus 200 -ExpectedContentType 'xml' -ExpectedSubstrings @('<test_xml>', '<row>', '<name>Eve</name>')
 
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_xml/1?format=xml"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_xml/1?format=xml"
 Assert-Test -TestName 'XML CRUD: GET record 1' -Response $r -ExpectedStatus 200 -ExpectedContentType 'xml' -ExpectedSubstrings @('<test_xml>', '<name>Eve</name>')
 
 $xmlUpdate = @'
@@ -499,7 +500,7 @@ $xmlUpdate = @'
   <active>true</active>
 </item>
 '@
-$r = Invoke-ConduitRequest -Method 'PUT' -Url "$base/test_xml/1" -Body $xmlUpdate -ContentType 'application/xml'
+$r = Invoke-ConduitRequest -Method 'PUT' -Url "$data/test_xml/1" -Body $xmlUpdate -ContentType 'application/xml'
 Assert-Test -TestName 'XML CRUD: PUT record 1' -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('<name>Eve M</name>')
 
 $xmlPatch = @'
@@ -507,10 +508,10 @@ $xmlPatch = @'
   <score>72</score>
 </item>
 '@
-$r = Invoke-ConduitRequest -Method 'PATCH' -Url "$base/test_xml/1" -Body $xmlPatch -ContentType 'application/xml'
+$r = Invoke-ConduitRequest -Method 'PATCH' -Url "$data/test_xml/1" -Body $xmlPatch -ContentType 'application/xml'
 Assert-Test -TestName 'XML CRUD: PATCH record 1' -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('<score>72</score>')
 
-$r = Invoke-ConduitRequest -Method 'DELETE' -Url "$base/test_xml/1"
+$r = Invoke-ConduitRequest -Method 'DELETE' -Url "$data/test_xml/1"
 Assert-Test -TestName 'XML CRUD: DELETE record 1' -Response $r -ExpectedStatus 204
 
 # 4.5 CSV CRUD (Table: test_csv)
@@ -519,61 +520,61 @@ $csvInsert = @'
 name,score,active
 Frank,55,true
 '@
-$r = Invoke-ConduitRequest -Method 'POST' -Url "$base/test_csv" -Body $csvInsert -ContentType 'text/csv'
+$r = Invoke-ConduitRequest -Method 'POST' -Url "$data/test_csv" -Body $csvInsert -ContentType 'text/csv'
 Assert-Test -TestName 'CSV CRUD: POST record' -Response $r -ExpectedStatus 201 -ExpectedContentType 'text/csv' -ExpectedSubstrings @('Frank')
 
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_csv?format=csv"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_csv?format=csv"
 Assert-Test -TestName 'CSV CRUD: GET collection' -Response $r -ExpectedStatus 200 -ExpectedContentType 'text/csv' -ExpectedSubstrings @('id,name,score,active', 'Frank')
 
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_csv/1?format=csv"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_csv/1?format=csv"
 Assert-Test -TestName 'CSV CRUD: GET record 1' -Response $r -ExpectedStatus 200 -ExpectedContentType 'text/csv' -ExpectedSubstrings @('Frank')
 
 $csvUpdate = @'
 name,score,active
 Frank M,59,true
 '@
-$r = Invoke-ConduitRequest -Method 'PUT' -Url "$base/test_csv/1" -Body $csvUpdate -ContentType 'text/csv'
+$r = Invoke-ConduitRequest -Method 'PUT' -Url "$data/test_csv/1" -Body $csvUpdate -ContentType 'text/csv'
 Assert-Test -TestName 'CSV CRUD: PUT record 1' -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('Frank M')
 
 $csvPatch = @'
 score
 63
 '@
-$r = Invoke-ConduitRequest -Method 'PATCH' -Url "$base/test_csv/1" -Body $csvPatch -ContentType 'text/csv'
+$r = Invoke-ConduitRequest -Method 'PATCH' -Url "$data/test_csv/1" -Body $csvPatch -ContentType 'text/csv'
 Assert-Test -TestName 'CSV CRUD: PATCH record 1' -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('63')
 
-$r = Invoke-ConduitRequest -Method 'DELETE' -Url "$base/test_csv/1"
+$r = Invoke-ConduitRequest -Method 'DELETE' -Url "$data/test_csv/1"
 Assert-Test -TestName 'CSV CRUD: DELETE record 1' -Response $r -ExpectedStatus 204
 
 # 4.6 CBOR CRUD (Table: test_cbor)
 Write-Host "`n  -> Testing CBOR CRUD" -ForegroundColor Magenta
 $cborItemBytes = [System.Convert]::FromHexString('a2646e616d65634574616573636f72651846')
-$r = Invoke-ConduitRequest -Method 'POST' -Url "$base/test_cbor" -Body $cborItemBytes -ContentType 'application/cbor'
+$r = Invoke-ConduitRequest -Method 'POST' -Url "$data/test_cbor" -Body $cborItemBytes -ContentType 'application/cbor'
 Assert-Test -TestName 'CBOR CRUD: POST record' -Response $r -ExpectedStatus 201 -ExpectedContentType 'application/cbor'
 
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_cbor?format=cbor"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_cbor?format=cbor"
 Assert-Test -TestName 'CBOR CRUD: GET collection' -Response $r -ExpectedStatus 200 -ExpectedContentType 'application/cbor'
 
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_cbor/1?format=cbor"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_cbor/1?format=cbor"
 Assert-Test -TestName 'CBOR CRUD: GET record 1' -Response $r -ExpectedStatus 200 -ExpectedContentType 'application/cbor'
 
 $cborUpdateBytes = [System.Convert]::FromHexString('a2646e616d656b45746120557064617465646573636f7265184b')
-$r = Invoke-ConduitRequest -Method 'PUT' -Url "$base/test_cbor/1" -Body $cborUpdateBytes -ContentType 'application/cbor'
+$r = Invoke-ConduitRequest -Method 'PUT' -Url "$data/test_cbor/1" -Body $cborUpdateBytes -ContentType 'application/cbor'
 Assert-Test -TestName 'CBOR CRUD: PUT record 1' -Response $r -ExpectedStatus 200 -ExpectedContentType 'application/cbor'
 
 $cborPatchBytes = [System.Convert]::FromHexString('a16573636f72651850')
-$r = Invoke-ConduitRequest -Method 'PATCH' -Url "$base/test_cbor/1" -Body $cborPatchBytes -ContentType 'application/cbor'
+$r = Invoke-ConduitRequest -Method 'PATCH' -Url "$data/test_cbor/1" -Body $cborPatchBytes -ContentType 'application/cbor'
 Assert-Test -TestName 'CBOR CRUD: PATCH record 1' -Response $r -ExpectedStatus 200 -ExpectedContentType 'application/cbor'
 
-$r = Invoke-ConduitRequest -Method 'DELETE' -Url "$base/test_cbor/1"
+$r = Invoke-ConduitRequest -Method 'DELETE' -Url "$data/test_cbor/1"
 Assert-Test -TestName 'CBOR CRUD: DELETE record 1' -Response $r -ExpectedStatus 204
 
 # 4.7 NDJSON Stream Output
 Write-Host "`n  -> Testing NDJSON Output" -ForegroundColor Magenta
-$null = Invoke-ConduitRequest -Method 'POST' -Url "$base/test_json" -Body '{"name":"NDJSON_1","score":10}' -ContentType 'application/json'
-$null = Invoke-ConduitRequest -Method 'POST' -Url "$base/test_json" -Body '{"name":"NDJSON_2","score":20}' -ContentType 'application/json'
+$null = Invoke-ConduitRequest -Method 'POST' -Url "$data/test_json" -Body '{"name":"NDJSON_1","score":10}' -ContentType 'application/json'
+$null = Invoke-ConduitRequest -Method 'POST' -Url "$data/test_json" -Body '{"name":"NDJSON_2","score":20}' -ContentType 'application/json'
 
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_json?format=ndjson"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_json?format=ndjson"
 Assert-Test -TestName 'NDJSON: GET collection as newline stream' `
     -Response $r -ExpectedStatus 200 -ExpectedContentType 'ndjson' -ExpectedSubstrings @('"name":"NDJSON_1"', '"name":"NDJSON_2"')
 
@@ -583,49 +584,49 @@ Assert-Test -TestName 'NDJSON: GET collection as newline stream' `
 Write-Section '5. Query Capabilities (WHERE DSL, ORDER BY, Pagination)'
 
 # Insert seed dataset into test_json
-$null = Invoke-ConduitRequest -Method 'POST' -Url "$base/test_json" -Body '{"name":"Filter_High","score":95,"active":true}' -ContentType 'application/json'
-$null = Invoke-ConduitRequest -Method 'POST' -Url "$base/test_json" -Body '{"name":"Filter_Mid","score":50,"active":true}' -ContentType 'application/json'
-$null = Invoke-ConduitRequest -Method 'POST' -Url "$base/test_json" -Body '{"name":"Filter_Low","score":15,"active":false}' -ContentType 'application/json'
+$null = Invoke-ConduitRequest -Method 'POST' -Url "$data/test_json" -Body '{"name":"Filter_High","score":95,"active":true}' -ContentType 'application/json'
+$null = Invoke-ConduitRequest -Method 'POST' -Url "$data/test_json" -Body '{"name":"Filter_Mid","score":50,"active":true}' -ContentType 'application/json'
+$null = Invoke-ConduitRequest -Method 'POST' -Url "$data/test_json" -Body '{"name":"Filter_Low","score":15,"active":false}' -ContentType 'application/json'
 
 # WHERE: Greater than
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_json?where=score > 60&format=json"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_json?where=score > 60&format=json"
 Assert-Test -TestName 'WHERE filter: score > 60' `
     -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('Filter_High') -UnexpectedSubstrings @('Filter_Low', 'Filter_Mid')
 
 # WHERE: Equality and Boolean
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_json?where=active = false&format=json"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_json?where=active = false&format=json"
 Assert-Test -TestName 'WHERE filter: active = false' `
     -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('Filter_Low') -UnexpectedSubstrings @('Filter_High')
 
 # WHERE: LIKE pattern matching
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_json?where=name LIKE '%Mid%'&format=json"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_json?where=name LIKE '%Mid%'&format=json"
 Assert-Test -TestName "WHERE filter: LIKE '%Mid%'" `
     -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('Filter_Mid') -UnexpectedSubstrings @('Filter_High')
 
 # WHERE: IN set membership
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_json?where=score IN (15, 95)&format=json"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_json?where=score IN (15, 95)&format=json"
 Assert-Test -TestName 'WHERE filter: IN list' `
     -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('Filter_High', 'Filter_Low') -UnexpectedSubstrings @('Filter_Mid')
 
 # WHERE: Compound expression with parentheses and AND/OR
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_json?where=(score >= 90 OR score <= 20) AND active = true&format=json"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_json?where=(score >= 90 OR score <= 20) AND active = true&format=json"
 Assert-Test -TestName 'WHERE filter: complex expression with precedence' `
     -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('Filter_High') -UnexpectedSubstrings @('Filter_Low')
 
 # ORDER BY: Column Descending
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_json?order=score:desc&format=json"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_json?order=score:desc&format=json"
 Assert-Test -TestName 'ORDER filter: score:desc' -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('Filter_High')
 
 # ORDER BY: Column Ascending
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_json?order=score:asc&format=json"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_json?order=score:asc&format=json"
 Assert-Test -TestName 'ORDER filter: score:asc' -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('Filter_Low')
 
 # Pagination: limit & offset
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_json?limit=1&offset=0&format=json"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_json?limit=1&offset=0&format=json"
 Assert-Test -TestName 'Pagination: limit=1 offset=0' -Response $r -ExpectedStatus 200
 
 # Unlimited pagination mode: limit=0
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_json?limit=0&format=json"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_json?limit=0&format=json"
 Assert-Test -TestName 'Pagination: limit=0 (unlimited)' -Response $r -ExpectedStatus 200 -ExpectedSubstrings @('Filter_High', 'Filter_Mid', 'Filter_Low')
 
 # ==============================================================================
@@ -644,18 +645,18 @@ $errorFormats = @(
 )
 
 foreach ($ef in $errorFormats) {
-    $r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_json/999999?format=$($ef.Fmt)"
+    $r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_json/999999?format=$($ef.Fmt)"
     $expectedSnips = if ($ef.Snippet) { @($ef.Snippet) } else { @() }
     Assert-Test -TestName "404 Error envelope ($($ef.Fmt))" `
         -Response $r -ExpectedStatus 404 -ExpectedContentType $ef.CT -ExpectedSubstrings $expectedSnips
 }
 
 # 400 Bad Request: Invalid sort column
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_json?order=nonexistent_col:asc"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_json?order=nonexistent_col:asc"
 Assert-Test -TestName '400 Error: Invalid ORDER BY column' -Response $r -ExpectedStatus 400 -ExpectedSubstrings @('Bad Request')
 
 # 422 Unprocessable Entity: Malformed WHERE syntax
-$r = Invoke-ConduitRequest -Method 'GET' -Url "$base/test_json?where=score >> 999"
+$r = Invoke-ConduitRequest -Method 'GET' -Url "$data/test_json?where=score >> 999"
 Assert-Test -TestName '422 Error: Malformed WHERE expression syntax' -Response $r -ExpectedStatus 422 -ExpectedSubstrings @('Unprocessable Entity')
 
 # 405 Method Not Allowed
@@ -681,7 +682,7 @@ Assert-Test -TestName 'Verify test tables removed from /schema list' `
 # Verify OpenAPI spec no longer includes dropped tables
 $r = Invoke-ConduitRequest -Method 'GET' -Url "$base/openapi.json"
 Assert-Test -TestName 'Verify OpenAPI spec invalidated and test tables removed' `
-    -Response $r -ExpectedStatus 200 -UnexpectedSubstrings @('"/test_json":', '"/test_yaml":')
+    -Response $r -ExpectedStatus 200 -UnexpectedSubstrings @('"/data/test_json":', '"/data/test_yaml":')
 
 # ==============================================================================
 # Summary Report

@@ -146,4 +146,3 @@ func TestParseWhereSQL_ComplexityBounding(t *testing.T) {
 		t.Fatalf("unexpected sql or args: %s, %v", sql, args)
 	}
 }
-

@@ -4,6 +4,8 @@ server:
     base_path: "/v1/"
     default_limit: 50
 
+enable_docs: true
+
 database:
     driver: "sqlite"
     dsn: "./app.db?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"

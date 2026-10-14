@@ -8,10 +8,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/time/rate"
 	"github.com/untappedtech/conduit/internal/auth"
 	"github.com/untappedtech/conduit/internal/domain"
 	"github.com/untappedtech/conduit/internal/errors"
+	"golang.org/x/time/rate"
 )
 
 type clientLimiterEntry struct {
@@ -206,4 +206,3 @@ func RateLimitMiddleware(config domain.RateLimitConfig, responseEncoder *Respons
 	rl := NewRateLimiter(config, responseEncoder, tokenExtractor...)
 	return rl.Middleware()
 }
-

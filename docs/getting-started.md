@@ -13,7 +13,7 @@ Download the Conduit source code and build the server binary:
 ```bash
 git clone https://github.com/untappedtech/conduit
 cd conduit
-go build -o conduit ./cmd/server
+go build ./cmd/conduit
 ```
 
 You now have a static `conduit` binary ready to execute.
@@ -31,7 +31,7 @@ You now have a static `conduit` binary ready to execute.
 ### Using `go run`
 
 ```bash
-go run ./cmd/server --config ./config.yaml
+go run ./cmd/conduit --config ./config.yaml
 ```
 
 If no configuration file path is passed explicitly, Conduit automatically searches the working directory in the following order:

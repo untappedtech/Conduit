@@ -85,5 +85,3 @@ func TestDecoder_XMLSchema(t *testing.T) {
 		t.Fatalf("unexpected column names: %v, %v", payload.Columns[0].Name, payload.Columns[1].Name)
 	}
 }
-
-

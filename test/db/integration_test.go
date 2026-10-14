@@ -352,4 +352,3 @@ func TestMySQL_Integration(t *testing.T) {
 		})
 	}
 }
-

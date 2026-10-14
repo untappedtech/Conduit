@@ -1,0 +1,294 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint & Code Hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Verify Go Formatting (gofmt)
+        run: |
+          UNFORMATTED=$(gofmt -s -l .)
+          if [ -n "$UNFORMATTED" ]; then
+            echo "The following files require formatting with gofmt -s -w:"
+            echo "$UNFORMATTED"
+            exit 1
+          fi
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Verify Module Tidiness (go mod tidy)
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum || (echo "go.mod or go.sum is not tidy. Run 'go mod tidy'." && exit 1)
+
+  test:
+    name: Unit & Integration Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Run Tests with Race Detector and Coverage (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Run Tests (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          go test -v ./...
+
+      - name: Upload Coverage Report Artifact
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-coverage-report
+          path: coverage.out
+          retention-days: 14
+
+  test-server:
+    name: Live Server E2E (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: [ lint ]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Build Conduit Binary
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path bin | Out-Null
+          $binName = if ($IsWindows) { "conduit.exe" } else { "conduit" }
+          go build -v -o "bin/$binName" ./cmd/conduit
+
+      - name: Launch Conduit Server & Wait for Healthy Status
+        shell: pwsh
+        run: |
+          $binName = if ($IsWindows) { "conduit.exe" } else { "conduit" }
+          $binPath = "./bin/$binName"
+          $proc = Start-Process -FilePath $binPath -ArgumentList "--config", "config.yaml" -PassThru
+          Write-Host "Spawned Conduit server process (PID: $($proc.Id))"
+
+          $healthy = $false
+          for ($i = 0; $i -lt 30; $i++) {
+              Start-Sleep -Seconds 1
+              try {
+                  $resp = Invoke-WebRequest -Uri "http://localhost:8080/v1/schema" -TimeoutSec 2 -SkipHttpErrorCheck
+                  if ($resp.StatusCode -eq 200) {
+                      $healthy = $true
+                      Write-Host "Conduit server is up and listening on port 8080 (attempt $($i+1))"
+                      break
+                  }
+              }
+              catch {
+                  Write-Host "Waiting for server to become responsive..."
+              }
+          }
+
+          if (-not $healthy) {
+              Write-Error "Conduit server failed to become responsive within 30 seconds"
+              exit 1
+          }
+
+      - name: Execute Live Server PowerShell Integration Suite
+        shell: pwsh
+        run: |
+          pwsh ./cmd/test_server/test_conduit.ps1 -BaseUrl "http://localhost:8080" -VerboseOutput
+
+      - name: Gracefully Terminate Conduit Server
+        if: always()
+        shell: pwsh
+        run: |
+          $proc = Get-Process -Name "conduit" -ErrorAction SilentlyContinue
+          if ($proc) {
+              Write-Host "Terminating Conduit server process..."
+              Stop-Process -Name "conduit" -Force
+          }
+
+  security:
+    name: Security Vulnerability Audit
+    runs-on: ubuntu-latest
+    needs: [ lint ]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          go-version-file: 'go.mod'
+
+  build:
+    name: Cross-Platform Build & Packaging
+    runs-on: ubuntu-latest
+    needs: [ test, test-server ]
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            ext: ""
+          - goos: linux
+            goarch: arm64
+            ext: ""
+          - goos: windows
+            goarch: amd64
+            ext: ".exe"
+          - goos: darwin
+            goarch: amd64
+            ext: ""
+          - goos: darwin
+            goarch: arm64
+            ext: ""
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Compile Binary (${{ matrix.goos }}/${{ matrix.goarch }})
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          mkdir -p dist
+          go build -trimpath -ldflags="-s -w" -o dist/conduit-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/conduit
+
+      - name: Upload Binary Artifact (${{ matrix.goos }}/${{ matrix.goarch }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: conduit-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/conduit-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+          retention-days: 7
+
+  validate-cli:
+    name: Validate CLI Features & OpenAPI Export
+    runs-on: ubuntu-latest
+    needs: [ test, test-server ]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Build Local Executable
+        run: go build -o conduit ./cmd/conduit
+
+      - name: Test Default Config Generation CLI Flags
+        run: |
+          ./conduit --generate-config json
+          ./conduit --generate-config yaml
+          ./conduit --generate-config toml
+          ./conduit --generate-config xml
+          test -s config.json && test -s config.yaml && test -s config.toml && test -s config.xml
+
+      - name: Test Static OpenAPI Specification Export
+        run: |
+          ./conduit --config config.yaml --export-openapi openapi.json
+          test -s openapi.json
+          grep -q '"openapi": "3.0.3"' openapi.json
+
+      - name: Upload Generated OpenAPI Specification
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-specification
+          path: openapi.json
+          retention-days: 30
+
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [ build, validate-cli ]
+    # Only execute this job if a semantic version tag (e.g., v1.0.0) is pushed
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write # Required permission to create releases and upload assets
+    steps:
+      - name: Download Compiled Binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: conduit-*
+          path: release-assets
+          merge-multiple: true # Flattens the directory structure
+
+      - name: Download OpenAPI Specification
+        uses: actions/download-artifact@v4
+        with:
+          name: openapi-specification
+          path: release-assets
+
+      - name: Generate Checksums
+        run: |
+          cd release-assets
+          sha256sum * > checksums.txt
+        shell: bash
+
+      - name: Create Release and Attach Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+
+

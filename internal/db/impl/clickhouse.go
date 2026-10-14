@@ -339,4 +339,3 @@ func (engine *ClickHouseEngine) HealthCheck(ctx context.Context) error {
 func (engine *ClickHouseEngine) Close() error {
 	return engine.sqlDatabase.Close()
 }
-

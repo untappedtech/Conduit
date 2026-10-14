@@ -127,7 +127,7 @@ Download prebuilt binaries for Linux, macOS, and Windows under **GitHub Releases
 ```bash
 git clone https://github.com/untappedtech/conduit
 cd conduit
-go build -o conduit ./cmd/server
+go build -o conduit ./cmd/conduit
 ```
 
 ---
